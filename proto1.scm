@@ -45,11 +45,12 @@
     (match `(,pattern ,expression)
       ((() ()) binding)
       (('_ _) binding)
-      ((('quote e) e) binding)
       (((? number? n) n) binding)
       (((? symbol? s) e) (match (lookup s #;in binding)
                            (#f `((,s . ,e) . ,binding))
                            (e* (and (equal? e e*) binding))))
+      ((('quote e) e) binding)
+      ((('quote e) _) #f) ;; !!! otherwise it could bind sth to quote !!!
       (((p . ps) (e . es)) (and-let* ((binding* (try p e binding))
                                       (binding** (try ps es binding*)))
                              binding**))
@@ -413,3 +414,62 @@
       ===> (fcl* likes drcz))
 
 ;;; incredible!
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define p2
+  '(
+(('SUBSTRING a b) (& (SUB ,a ,b ,a ,b)))
+
+(('SUB       () b oryg-a oryg-b) 'FOUND!)
+(('SUB (e . a*) b oryg-a oryg-b) (& (TRY ,e ,a* ,b ,oryg-a ,oryg-b)))
+
+(('TRY e a      () oryg-a oryg-b) 'NOT-FOUND!)
+(('TRY e a (e . b) oryg-a oryg-b) (& (SUB ,a ,b ,oryg-a ,oryg-b)))
+(('TRY e a (_ . b) oryg-a oryg-b) (& (NEXT ,oryg-a ,oryg-b)))
+
+(('NEXT a (_ . b)) (& (SUB ,a ,b ,a ,b)))
+(('NEXT a      ()) 'NOT-FOUND!)
+))
+
+(e.g. (pindolf '(SUBSTRING (k u l a) (m a k u l a t u r a)) p2)
+      ===> FOUND!)
+(e.g. (pindolf '(SUBSTRING (k u r a) (m a k u l a t u r a)) p2)
+      ===> NOT-FOUND!)
+
+(e.g. (FCL* (compiled p2)
+            '(SUBSTRING (k u l a) (m a k u l a t u r a)))
+      ===> FOUND!)
+
+(e.g. (FCL* (compiled p2)
+            '(SUBSTRING (k u r a) (m a k u l a t u r a)))
+      ===> NOT-FOUND!)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define p3
+'( ;; playing with defunctionalized higher-order-procedures
+
+(('fold-r op e       ()) e)
+(('fold-r op e (x . xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+
+(('cons h t) `(,h . ,t))
+(('apd xs ys) (& (fold-r cons ,ys ,xs)))
+
+((('cons*f.hd f) h t) (& (cons ,(& (,f ,h)) ,t)))
+(('map f xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
+
+(('dup x) `(,x . ,x))
+(('dbl n) (+ n n))
+))
+
+(e.g. (pindolf '(apd (q w e) (a s d)) p3) ===> (q w e a s d))
+(e.g. (pindolf '(map dbl (1 2 3)) p3) ===> (2 4 6))
+(e.g. (pindolf '(map dup (- 0 ^)) p3) ===> ((- . -) (0 . 0) (^ . ^)))
+
+(e.g. (FCL* (compiled p3) '(apd (q w e) (a s d))) ===> (q w e a s d))
+(e.g. (FCL* (compiled p3) '(map dbl (1 2 3))) ===> (2 4 6))
+(e.g. (FCL* (compiled p3) '(map dup (- 0 ^)))
+      ===> ((- . -) (0 . 0) (^ . ^)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  
