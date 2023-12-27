@@ -1,6 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; an ultra-fast and dirty re-implementation of PINDOLF
-;;; i just turned 39 btw.
 (use-modules (grand scheme))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -120,12 +119,6 @@
              (& (PLUS ,(& (VAL ,a)) ,(& (VAL ,b)))) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;czyli tera tak: listuj je, i wtedy po kolei każdej buduj ten rytualny
-;(LET *VIEW* <kompilat formy>)
-;(CALL (0) *VIEW*)
-;no i teraz ino jak jest kompilat to on sam w sobie musi podstawiać,
-;wiadomo. więc mapa tych cudów jeszcze potrzebna prosta wiesz, jechane
-
 (define (application->vars-map #;for expression)
   (let ((applications (applications-in expression)))
     (map (lambda (app index) `(,app . (V ,index)))
@@ -185,7 +178,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (compiled-expression expression) ;; a codeblock...
+(define (compiled-expression expression)
   (let* ((vars4apps (application->vars-map expression))
          (apps-code
           (map (lambda (((& e) . var))
@@ -229,7 +222,7 @@
 
       (((('quote e) v) . pending*)
        (let* ((code* `(,@code
-                       ((,index ,subindex) (IF (EQ? ,v ,e)
+                       ((,index ,subindex) (IF (EQ? ,v ',e)
                                                (,index ,(1+ subindex))
                                                ELSE (,(1+ index) 0)))))
               (subindex* (1+ subindex)))
@@ -276,7 +269,7 @@
 (e.g. (compiled-clause '(('APD () ys) ys) 1)
       ===>
       (((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
-       ((1 1) (IF (EQ? (CAR *VIEW*) APD) (1 2) ELSE (2 0)))
+       ((1 1) (IF (EQ? (CAR *VIEW*) 'APD) (1 2) ELSE (2 0)))
        ((1 2) (IF (CONS? (CDR *VIEW*)) (1 3) ELSE (2 0)))
        ((1 3) (IF (NIL? (CAR (CDR *VIEW*))) (1 4) ELSE (2 0)))
        ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
@@ -288,7 +281,7 @@
                        2)
       ===>
       (((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
-       ((2 1) (IF (EQ? (CAR *VIEW*) APD) (2 2) ELSE (3 0)))
+       ((2 1) (IF (EQ? (CAR *VIEW*) 'APD) (2 2) ELSE (3 0)))
        ((2 2) (IF (CONS? (CDR *VIEW*)) (2 3) ELSE (3 0)))
        ((2 3) (IF (CONS? (CAR (CDR *VIEW*))) (2 4) ELSE (3 0)))
        ((2 4) (IF (CONS? (CDR (CDR *VIEW*))) (2 5) ELSE (3 0)))
@@ -299,8 +292,6 @@
               (LET *VIEW* (CONS 'APD (CONS xs (CONS ys ()))))
               (LET (V 0) (CALL (0) *VIEW*))
               (RETURN (CONS x (V 0))))))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (compiled program)
@@ -315,7 +306,7 @@
       ===> ( ((0) (GOTO (0 0)))
 
              ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
-             ((0 1) (IF (EQ? (CAR *VIEW*) APD) (0 2) ELSE (1 0)))
+             ((0 1) (IF (EQ? (CAR *VIEW*) 'APD) (0 2) ELSE (1 0)))
              ((0 2) (IF (CONS? (CDR *VIEW*)) (0 3) ELSE (1 0)))
              ((0 3) (IF (NIL? (CAR (CDR *VIEW*))) (0 4) ELSE (1 0)))
              ((0 4) (IF (CONS? (CDR (CDR *VIEW*))) (0 5) ELSE (1 0)))
@@ -324,7 +315,7 @@
                     (RETURN ys))
 
              ((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
-             ((1 1) (IF (EQ? (CAR *VIEW*) APD) (1 2) ELSE (2 0)))
+             ((1 1) (IF (EQ? (CAR *VIEW*) 'APD) (1 2) ELSE (2 0)))
              ((1 2) (IF (CONS? (CDR *VIEW*)) (1 3) ELSE (2 0)))
              ((1 3) (IF (CONS? (CAR (CDR *VIEW*))) (1 4) ELSE (2 0)))
              ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
@@ -335,6 +326,90 @@
                     (LET *VIEW* (CONS 'APD (CONS xs (CONS ys ()))))
                     (LET (V 0) (CALL (0) *VIEW*))
                     (RETURN (CONS x (V 0)))) ))
-
-
 ;;;; brilliaaaaaaaaaaaaaaaaant \o/
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; now the fast and dirty (re-)implementation of FLC* variant
+;;; (flowcharts with fun.calls similar to Glueck'2012 or sth)
+
+;;; we presume it always starts at (0) and the input is *VIEW*?
+;;; primops should be CONS,CAR,CDR,+,-,CONS?,NIL?,EQ? + const ()
+;;; aaand the calls should be limited to *VIEW*-modifying ones 4now
+;;; ----------------------------------------------------------------
+
+(define (updated binding #;with sym #;bound-to val)
+  (match binding
+    (() `((,sym . ,val)))
+    (((sym* . val*) . binding*)
+     (if (equal? sym* sym)
+         `((,sym . ,val) . ,binding*)
+         `((,sym* . ,val*) . ,(updated binding* sym val))))))
+
+(e.g. (updated '((x . 23)) #;with 'y #;bound-to '42)
+      ===> ((x . 23) (y . 42)))
+(e.g. (updated '((x . 23) (y . 997)) 'y '42)
+      ===> ((x . 23) (y . 42)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define fcl/true 'T)
+(define fcl/false '())
+
+(define (fcl/value expression binding)
+  (match expression
+    (() '())
+    ('T 'T) ;; he_he
+    ((? number? n) n)
+    ((? symbol? s) (lookup s binding))
+    (('V (? number?)) (lookup expression binding)) ;;; !!!!!
+    (('quote e) e)
+    (('+ e e*) (+ (fcl/value e binding) (fcl/value e* binding)))
+    (('- e e*) (- (fcl/value e binding) (fcl/value e* binding)))
+    (('CONS e e*) (cons (fcl/value e binding) (fcl/value e* binding)))
+    (('CAR e) (car (fcl/value e binding)))
+    (('CDR e) (cdr (fcl/value e binding)))
+    (('NIL? e) (if (null? (fcl/value e binding)) fcl/true fcl/false))
+    (('CONS? e) (if (pair? (fcl/value e binding)) fcl/true fcl/false))
+    (('EQ? e e*) (if (equal? (fcl/value e binding)
+                             (fcl/value e* binding))
+                     fcl/true fcl/false))
+    (_ 'error)))
+
+(e.g. (fcl/value '(+ 2 3) '()) ===> 5)
+(e.g. (fcl/value '(CONS 'hi (CONS x ())) '((x . there)))
+      ===> (hi there))
+(e.g. (fcl/value '(EQ? x (CONS (CAR x) (CDR x))) '((x . (q w e))))
+      ===> T)
+(e.g. (fcl/value '(EQ? (NIL? a) T) '((a . ()))) ===> T)
+(e.g. (fcl/value '(EQ? (NIL? a) T) '((a . (1 2)))) ===> ())
+
+(e.g. (fcl/value '(+ (V 0) (V 1)) '(((V 0) . 2) ((V 1) . 3))) ===> 5)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (FCL* program input)
+  (let loop ((binding `((*VIEW* . ,input)))
+             (cur-block (lookup '(0) program)))
+    (match cur-block
+      ((('LET v ('CALL pp v*)) . cur-block*)
+       (let ((val (loop `((*VIEW* . ,(lookup v* binding)))
+                        (lookup pp program))))
+         (loop (updated binding v val) cur-block*)))
+
+      ((('LET v e) . cur-block*)
+       (let ((val (fcl/value e binding)))
+         (loop (updated binding v val) cur-block*)))
+
+      ((('GOTO pp)) (loop binding (lookup pp program)))
+
+      ((('RETURN e)) (fcl/value e binding))       
+
+      ((('IF e pp-t 'ELSE pp-f))
+       (if (equal? (fcl/value e binding) fcl/false)
+           (loop binding (lookup pp-f program))
+           (loop binding (lookup pp-t program)))))))
+
+(e.g. (FCL* (compiled p1) '(APD (q w e) (1 2 3)))
+      ===> (q w e 1 2 3))
+(e.g. (FCL* (compiled p1) '(MUL 3 5)) ===> 15)
+(e.g. (FCL* (compiled p1) '(REV (drcz likes fcl*)))
+      ===> (fcl* likes drcz))
+
+;;; incredible!
