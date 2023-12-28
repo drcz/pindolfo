@@ -70,7 +70,9 @@
       (((pattern expression) . program**)
        (match (matching? init-expression #;against pattern)
          (#f (try program**))
-         (binding (value #;of expression
+         (binding ;(pretty-print `(matched ,init-expression with ,pattern))
+                  ;(pretty-print `(binding: ,binding))
+                  (value #;of expression
                          #;wrt binding #;and program)))))))
 
 (define p1 ;;; a bigger test y'know
@@ -388,6 +390,7 @@
 (define (FCL* program input)
   (let loop ((binding `((*VIEW* . ,input)))
              (cur-block (lookup '(0) program)))
+    ;[pretty-print binding]
     (match cur-block
       ((('LET v ('CALL pp v*)) . cur-block*)
        (let ((val (loop `((*VIEW* . ,(lookup v* binding)))
@@ -471,5 +474,191 @@
       ===> ((- . -) (0 . 0) (^ . ^)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; tmp i thought maybe there was something wrong with nested
+;;; applications but nope, all good:
+(define t23
+  '(
+    (('apd () ys) ys)
+    (('apd (x . xs) ys) `(,x . ,(& (apd ,xs ,ys))))
+    (('gen-xs) `(p n d l f))
+    (('test) (& (apd ,(& (gen-xs)) ,(& (gen-xs)))))
+    (('test2) `(>> ,(& (gen-xs)) <<))))
 
-  
+(e.g. (pindolf '(test) t23) ===> (p n d l f p n d l f))
+(e.g. (pindolf '(test2) t23) ===> (>> (p n d l f) <<))
+;;; this could get to some test suite or sth anyway...
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; now for some real hardcode, DRC machine...
+
+(define p4
+  '(
+;;; abstract machine from my b.sc thesis,
+;;; in CPS (stolen&redacted from CONSpiracy repo)
+
+(('id x) x) ;; for testing only
+
+#;( -- yup, cats are the bosses -- )
+(('cat ()       ys K) (& (,K ,ys)))
+(('cat (x . xs) ys K) (& (cat ,xs ,ys (catK ,x ,K))))
+((('catK x k) v) (& (,k (,x . ,v))))
+
+#;( -- operations on dictionary (the D register) -- )
+(('name k v dict K) (& (,K ((,k . ,v) . ,dict))))
+
+(('forget k ((k . _) . dict) K) (& (,K ,dict)))
+(('forget k (     kv . dict) K) (& (forget ,k ,dict (forgetK ,kv ,K))))
+((('forgetK kv K) x) (& (,K (,kv . ,x))))
+
+(('lookup k ((k . v) . _) K) (& (,K ,v)))
+(('lookup k (_ . dict)    K) (& (lookup ,k ,dict ,K)))
+
+#;( -- the machine proper starts here -- )
+(('run-drc program inputs) (& (=>* () ,inputs ,program)))
+
+#;(- STORE, or operating on D -)
+(('=>* D (e . R) (('NAME n)   . C)) (& (name ,n ,e ,D (=>*DK ,R ,C))))
+(('=>* D    R    (('FORGET n) . C)) (& (forget ,n ,D (=>*DK ,R ,C))))
+(('=>* D    R    (('LOOKUP n) . C)) (& (lookup ,n ,D (=>*RK ,D ,R ,C))))
+
+#;(- ...plus its three little continuations -)
+((('=>*DK R C) D) (& (=>* ,D ,R ,C)))
+((('=>*CK R D) C) (& (=>* ,D ,R ,C)))
+((('=>*RK D R C) r) (& (=>* ,D (,r . ,R) ,C)))
+
+#;(- CONSTANTS AND OPS, or operating on R -)
+(('=>* D R (('CONST e) . C)) (& (=>* ,D (,e . ,R) ,C)))
+(('=>* D R (('PROC p)  . C)) (& (=>* ,D (,p . ,R) ,C)))
+
+(('=>* D (h t . R)     (('CONS) . C)) (& (=>* ,D ((,h . ,t) . ,R) ,C)))
+(('=>* D ((h . t) . R) (('CAR) . C)) (& (=>* ,D (,h . ,R) ,C)))
+(('=>* D ((h . t) . R) (('CDR) . C)) (& (=>* ,D (,t . ,R) ,C)))
+
+(('=>* D (e e . R)     (('EQ?) . C)) (& (=>* ,D (T  . ,R) ,C)))
+(('=>* D (_ _ . R)     (('EQ?) . C)) (& (=>* ,D (() . ,R) ,C)))
+(('=>* D ((h . t) . R) (('ATOM?) . C)) (& (=>* ,D (() . ,R) ,C)))
+(('=>* D (_       . R) (('ATOM?) . C)) (& (=>* ,D (T  . ,R) ,C)))
+
+#;(- CONTROL FLOW, or operating on C -)
+(('=>* D (() . R) (('SELECT p p*) . C)) (& (cat ,p* ,C (=>*CK ,R ,D))))
+(('=>* D (_  . R) (('SELECT p p*) . C)) (& (cat ,p ,C (=>*CK ,R ,D))))
+(('=>* D (p . R) (('APPLY) . C)) (& (cat ,p ,C (=>*CK ,R ,D))))
+
+#;(- halting? not a problem! -)
+(('=>* D (e . R) ()) e) ;;; could have R empty actually...?
+
+#;(- example program, ofc it concatenates two lists -)
+(('mk-example) `((PROC ((NAME xs)
+                        (NAME ys)
+                        (LOOKUP xs)
+                        (CONST ())
+                        (EQ?)
+                        (SELECT ((LOOKUP ys))
+                                ((LOOKUP ys)
+                                 (LOOKUP xs)
+                                 (CDR)
+                                 (LOOKUP apd)
+                                 (APPLY)
+                                 (LOOKUP xs)
+                                 (CAR)
+                                 (CONS)))
+                        (FORGET ys)
+                        (FORGET xs)))
+                 (NAME apd)
+                 (LOOKUP apd)
+                 (APPLY)))
+
+(('run-test) (& (run-drc ,(& (mk-example)) ((q w e) (a s d)))))
+(('run-test2 xs ys) (& (run-drc ,(& (mk-example)) (,xs ,ys))))
+
+))
+
+; --------------------------------------------------------------
+
+;;; testing one procedure at a time:
+(e.g. (pindolf '(cat (q w e) (1 2 3) id) p4)
+      ===> (q w e 1 2 3))
+(e.g. (pindolf '(name J 23 ((ans . 42)) id) p4)
+      ===> ((J . 23) (ans . 42)))
+(e.g. (pindolf '(forget ans ((J . 23) (ans . 42)) id) p4)
+      ===> ((J . 23)))
+(e.g. (pindolf '(forget J ((J . 23) (ans . 42)) id) p4)
+      ===> ((ans . 42)))
+(e.g. (pindolf '(lookup J ((J . 23) (ans . 42)) id) p4)
+      ===> 23)
+(e.g. (pindolf '(lookup ans ((J . 23) (ans . 42)) id) p4)
+      ===> 42)
+;;; ok, more like testing one functionality at a time...
+(e.g. (pindolf '(run-drc ((CONST 23) (CONST 42) (CONS)) ()) p4)
+      ===> (42 . 23))
+(e.g. (pindolf '(run-drc ((CONS)) (23 42)) p4)
+      ===> (23 . 42))
+(e.g. (pindolf '(run-drc ((NAME ans)
+                          (LOOKUP ans)
+                          (LOOKUP ans)
+                          (CONS))
+                         (42)) p4) ===> (42 . 42))
+(e.g. (pindolf '(run-drc ((NAME ans)
+                          (LOOKUP ans)
+                          (LOOKUP ans)
+                          (EQ?))
+                         (42)) p4) ===> T)
+(e.g. (pindolf '(run-drc ((NAME ans)
+                          (LOOKUP ans)
+                          (LOOKUP ans)
+                          (LOOKUP ans)
+                          (CONS)
+                          (EQ?))
+                         (42)) p4) ===> ())
+(e.g. (pindolf '(run-drc ((NAME a)
+                          (LOOKUP a)
+                          (FORGET a))
+                         (42)) p4) ===> 42)
+(e.g. (pindolf '(run-drc ((PROC ((NAME a)
+                                 (LOOKUP a)
+                                 (LOOKUP a)
+                                 (CONS)
+                                 (FORGET a)))
+                          (APPLY))
+                         (he)) p4) ===> (he . he))
+
+(e.g. (pindolf '(run-drc ((PROC ((NAME a)
+                                 (LOOKUP a)
+                                 (LOOKUP a)
+                                 (CONS)
+                                 (FORGET a)))
+                          (NAME dbl)
+                          (LOOKUP dbl)
+                          (APPLY))
+                         (hi)) p4) ===> (hi . hi))
+
+;;; finally! silly errors in silly old repos lol.
+(e.g. (pindolf '(run-drc ((PROC ((NAME xs)
+                                 (NAME ys)
+                                 (LOOKUP xs)
+                                 (CONST ())
+                                 (EQ?)
+                                 (SELECT ((LOOKUP ys))
+                                         ((LOOKUP ys)
+                                          (LOOKUP xs)
+                                          (CDR)
+                                          (LOOKUP apd)
+                                          (APPLY)
+                                          (LOOKUP xs)
+                                          (CAR)
+                                          (CONS)))
+                                 (FORGET ys)
+                                 (FORGET xs)))
+                          (NAME apd)
+                          (LOOKUP apd)
+                          (APPLY)) ((q w e) (a s d))) p4)
+      ===> (q w e a s d))
+
+;;; and it works like a charm
+(e.g. (pindolf '(run-test) p4) ===> (q w e a s d))
+(e.g. (pindolf '(run-test2 (it does) (work indeed)) p4)
+      ===> (it does work indeed))
+;;; and compiles correctly too
+(e.g. (FCL* (compiled p4) '(run-test)) ===> (q w e a s d))
+(e.g. (FCL* (compiled p4) '(run-test2 (it does) (work indeed)))
+      ===> (it does work indeed))
