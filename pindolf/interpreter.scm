@@ -1,6 +1,6 @@
 (define-module (pindolf interpreter)
   #:use-module (grand scheme)
-  #:export (pindolf value matching?))
+  #:export (pindolf value matching? lookup))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; an ultra-fast and dirty re-implementation of PINDOLF
@@ -72,9 +72,7 @@
       (((pattern expression) . program**)
        (match (matching? init-expression #;against pattern)
          (#f (try program**))
-         (binding ;(pretty-print `(matched ,init-expression with ,pattern))
-                  ;(pretty-print `(binding: ,binding))
-                  (value #;of expression
+         (binding (value #;of expression
                          #;wrt binding #;and program)))))))
 
 (define p1 ;;; a bigger test y'know
