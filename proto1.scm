@@ -662,3 +662,14 @@
 (e.g. (FCL* (compiled p4) '(run-test)) ===> (q w e a s d))
 (e.g. (FCL* (compiled p4) '(run-test2 (it does) (work indeed)))
       ===> (it does work indeed))
+
+
+#| todo
+conceptually:
+ - shouldn't only atoms be quoted in patterns? i think so!
+ - we should prolly have some var types (sym, num, any) hmm?
+ - tail call optimization in the compiler [optional but neat]
+ - some step debugger seems necessary
+ with these we could move on with pindof in pindolf and then
+ abstract interpretation...
+|#
