@@ -2,6 +2,8 @@
   #:use-module (grand scheme)
   #:export (run))
 
+(define (atom? x) (not (pair? x)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; now the fast and dirty (re-)implementation of FLC* variant
 ;;; (flowcharts with fun.calls similar to Glueck'2012 or sth)
@@ -49,6 +51,9 @@
     (('CAR e) (car (value e binding)))
     (('CDR e) (cdr (value e binding)))
     (('NIL? e) (if (null? (value e binding)) 'T '()))
+    (('NUM? e) (if (number? (value e binding)) 'T '()))
+    (('SYM? e) (if (symbol? (value e binding)) 'T '()))
+    (('ATM? e) (if (atom? (value e binding)) 'T '()))
     (('CONS? e) (if (pair? (value e binding)) 'T '()))
     (('EQ? e e*) (if (equal? (value e binding) (value e* binding))
                      'T '()))
@@ -61,6 +66,14 @@
       ===> T)
 (e.g. (value '(EQ? (NIL? a) T) '((a . ()))) ===> T)
 (e.g. (value '(EQ? (NIL? a) T) '((a . (1 2)))) ===> ())
+
+(e.g. (value '(ATM? 'x) '()) ===> T)
+(e.g. (value '(ATM? '(nope)) '()) ===> ())
+(e.g. (value '(NUM? 23) '()) ===> T)
+(e.g. (value '(NUM? x) '((x . 23))) ===> T)
+(e.g. (value '(NUM? x) '((x . nope!))) ===> ())
+(e.g. (value '(SYM? x) '((x . yup))) ===> T)
+(e.g. (value '(SYM? x) '((x . (n o p e)))) ===> ())
 
 (e.g. (value '(+ (V 0) (V 1)) '(((V 0) . 2) ((V 1) . 3))) ===> 5)
 
@@ -112,3 +125,34 @@
       '(APD (q w e) (1 2 3)))
  ===> (q w e 1 2 3))
 ;;; incredible!
+
+(e.g. (run '(((0) (GOTO (0 0)))
+            ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
+            ((0 1) (IF (EQ? (CAR *VIEW*) 'MUL) (0 2) ELSE (1 0)))
+            ((0 2) (IF (CONS? (CDR *VIEW*)) (0 3) ELSE (1 0)))
+            ((0 3) (IF (EQ? (CAR (CDR *VIEW*)) 0) (0 4) ELSE (1 0)))
+            ((0 4) (IF (CONS? (CDR (CDR *VIEW*))) (0 5) ELSE (1 0)))
+            ((0 5) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (0 6) ELSE (1 0)))
+            ((0 6) (RETURN 0))
+            ((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
+            ((1 1) (IF (EQ? (CAR *VIEW*) 'MUL) (1 2) ELSE (2 0)))
+            ((1 2) (IF (CONS? (CDR *VIEW*)) (1 3) ELSE (2 0)))
+            ((1 3) (IF (EQ? (CAR (CDR *VIEW*)) 1) (1 4) ELSE (2 0)))
+            ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
+            ((1 5) (IF (NUM? (CAR (CDR (CDR *VIEW*)))) (1 6) ELSE (2 0)))
+            ((1 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (1 7) ELSE (2 0)))
+            ((1 7) (LET x (CAR (CDR (CDR *VIEW*))))
+                   (RETURN x))
+            ((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
+            ((2 1) (IF (EQ? (CAR *VIEW*) 'MUL) (2 2) ELSE (3 0)))
+            ((2 2) (IF (CONS? (CDR *VIEW*)) (2 3) ELSE (3 0)))
+            ((2 3) (IF (NUM? (CAR (CDR *VIEW*))) (2 4) ELSE (3 0)))
+            ((2 4) (IF (CONS? (CDR (CDR *VIEW*))) (2 5) ELSE (3 0)))
+            ((2 5) (IF (NUM? (CAR (CDR (CDR *VIEW*)))) (2 6) ELSE (3 0)))
+            ((2 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (2 7) ELSE (3 0)))
+            ((2 7) (LET y (CAR (CDR (CDR *VIEW*))))
+                   (LET x (CAR (CDR *VIEW*)))
+                   (LET *VIEW* (CONS 'MUL (CONS (- x 1) (CONS y ()))))
+                   (LET (V 0) (CALL (0) *VIEW*))
+                   (RETURN (+ y (V 0)))))
+           '(MUL 3 5)) ===> 15)

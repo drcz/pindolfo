@@ -15,7 +15,7 @@
 (e.g. (lookup 'q '((x . 23) (y . 42) (z . ho!))) ===> #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (value #;of expression #;wrt binding #;and program)
+(define (value #;of expression #;wrt binding #;and app)
   (let value* ((expression expression))
     (define (value-qq expr)
       (match expr
@@ -30,7 +30,7 @@
       (('quasiquote expr) (value-qq expr))
       (('+ e e*) (+ (value* e) (value* e*)))
       (('- e e*) (- (value* e) (value* e*)))
-      (('& expr) (pindolf (value-qq expr) program))
+      (('& expr) (app (value-qq expr)))
      (_ 'ERROR))))
 
 (e.g. (value '23 '() '_) ===> 23)
@@ -40,55 +40,102 @@
       ===> (hi there))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (atom? x) (not (pair? x))) ;; hehe
+
 (define (matching? expression #;against pattern)
+  (define (symbol-match? sym expr binding)
+    (match (lookup sym #;in binding)
+      (#f `((,sym . ,expr) . ,binding))
+      (expr* (and (equal? expr expr*) binding))))
   (let try ((pattern pattern)
             (expression expression)
-            (binding '()))
+            (binding '()))    
     (match `(,pattern ,expression)
-      ((() ()) binding)
       (('_ _) binding)
+      ((() ()) binding)
+      (('T 'T) binding)
       (((? number? n) n) binding)
-      (((? symbol? s) e) (match (lookup s #;in binding)
-                           (#f `((,s . ,e) . ,binding))
-                           (e* (and (equal? e e*) binding))))
+      ((('num (? symbol? s)) (? number? n)) (symbol-match? s n binding))
+      ((('num _) _) #f)
+      ((('sym (? symbol? s)) (? symbol? s*)) (symbol-match? s s* binding))
+      ((('sym _) _) #f)
+      ((('atm (? symbol? s)) (? atom? a)) (symbol-match? s a binding))
+      ((('atm _) _) #f)
+      ((('exp (? symbol? s)) e) (symbol-match? s e binding))
       ((('quote e) e) binding)
-      ((('quote e) _) #f) ;; !!! otherwise it could bind sth to quote !!!
+      ((('quote e) _) #f) ;; hmmm?
       (((p . ps) (e . es)) (and-let* ((binding* (try p e binding))
                                       (binding** (try ps es binding*)))
                              binding**))
       (_ #f))))
       
-(e.g. (matching? '(a b c) '('a . xs)) ===> ((xs . (b c))))
-(e.g. (matching? '(a b c) '(_ 'b x)) ===> ((x . c)))
-(e.g. (matching? '(q w e) '(x y 'z)) ===> #f)
-(e.g. (matching? '(q (1 2 3) w) '(x (_ n 3) x*))
+(e.g. (matching? '(a b c) '('a . (exp xs))) ===> ((xs . (b c))))
+(e.g. (matching? '(a b c) '(_ 'b (atm x))) ===> ((x . c)))
+(e.g. (matching? '(q w e) '((exp x) (exp y) 'z)) ===> #f)
+(e.g. (matching? '(q (1 2 3) w) '((sym x) (_ (num n) 3) (exp x*)))
       ===> ((x* . w) (n . 2) (x . q)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (pindolf init-expression #;wrt program)
   (let try ((program* program))
     (match program*
-      (() 'NO-MATCH)
+      (() 'pndlf:NO-MATCH)
       (((pattern expression) . program**)
        (match (matching? init-expression #;against pattern)
          (#f (try program**))
          (binding (value #;of expression
-                         #;wrt binding #;and program)))))))
+                         #;wrt binding
+                         #;and (lambda (e) (pindolf e program)))))))))
 
-(define p1 ;;; a bigger test y'know
-  '( (('APD () ys) ys)
-     (('APD (x . xs) ys) `(,x . ,(& (APD ,xs ,ys))))
 
-     (('MUL 0 x) 0)
-     (('MUL 1 x) x)
-     (('MUL x y) (+ y (& (MUL ,(- x 1) ,y))))
+(define t1
+  '( (('apd () (exp ys)) ys)
+     (('apd ((exp x) . (exp xs)) (exp ys)) `(,x . ,(& (apd ,xs ,ys)))) )
+)
 
-     (('REV xs) (& (REV ,xs ())))
-     (('REV () rs) rs)
-     (('REV (x . xs) rs) (& (REV ,xs (,x . ,rs))))
-     ))
-     
-(e.g. (pindolf '(APD (q w e) (a s d)) p1) ===> (q w e a s d))
-(e.g. (pindolf '(MUL 3 5) p1) ===> 15)
-(e.g. (pindolf '(REV (dercz likes pindolf)) p1)
+(e.g. (pindolf '(apd (q w e) (1 2 3)) t1) ===> (q w e 1 2 3))
+
+(define t2
+'((('lookup (exp k) (((exp k) . (exp v)) . _)) `(JUST ,v))
+  (('lookup (exp k) (_ . (exp bnd))) (& (lookup ,k ,bnd)))
+  (('lookup _ ()) '(NONE))))
+
+(e.g. (pindolf '(lookup x ((x . 23))) t2) ===> (JUST 23))
+(e.g. (pindolf '(lookup y ((x . 23) (y . 42))) t2) ===> (JUST 42))
+(e.g. (pindolf '(lookup z ((x . 23) (y . 42))) t2) ===> (NONE))
+
+
+;;; i know they look nasty but just as (quote x) we write 'x
+;;; in a few steps we'll be able to write (num n) as #n or (sym s) as $s
+;;; and MAYBE we'll allow (exp x) as x (worst case as ?x).
+;;; the deal though is that everything is quite regular so that
+;;; we won't get lost in space once we start metaprogramming...
+
+(define t3
+'(
+(('fold-r (exp op) (exp e)       ())
+ e)
+(('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
+ (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+
+(('cons (exp h) (exp t)) `(,h . ,t))
+(('apd (exp xs) (exp ys)) (& (fold-r cons ,ys ,xs)))
+
+((('cons*f.hd (exp f)) (exp h) (exp t)) (& (cons ,(& (,f ,h)) ,t)))
+(('map (exp f) (exp xs)) (& (fold-r (cons*f.hd ,f) () ,xs)))
+
+(('dup (exp x)) `(,x . ,x))
+(('dbl (num n)) (+ n n))
+
+(('rev (exp xs)) (& (rev ,xs ())))
+(('rev () (exp rs)) rs)
+(('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
+
+))
+
+(e.g. (pindolf '(apd (q w e) (a s d)) t3) ===> (q w e a s d))
+(e.g. (pindolf '(map dbl (1 2 3)) t3) ===> (2 4 6))
+(e.g. (pindolf '(map dup (- 0 ^)) t3) ===> ((- . -) (0 . 0) (^ . ^)))
+(e.g. (pindolf '(rev (dercz likes pindolf)) t3)
       ===> (pindolf likes dercz))
+

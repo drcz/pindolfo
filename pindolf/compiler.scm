@@ -2,6 +2,8 @@
   #:use-module (grand scheme)
   #:export (compiled))
 
+(define (member? x xs) (and (member x xs) #t)) ;; :)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; even faster and dirtier pindolf->FCL* compiler
 
@@ -127,6 +129,8 @@
              (RETURN (CONS x (V 0))) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (vartype? x) (member? x '(num sym atm exp)))
+
 (define (compiled-clause (pattern expression) index)
   (let loop ((binding '())
              (code '())
@@ -165,10 +169,41 @@
               (subindex* (1+ subindex)))
          (loop binding code* subindex* pending*)))
 
-      ((((? symbol? s) v) . pending*)
+      ;;; i must admit it's not a very friendly procedure
+      ;;; and this section is extremely unfriendly. TODO
+      (((((? vartype? t) (? symbol? s)) v) . pending*)
        (match (lookup s #;in binding)
-         (#f (let* ((binding* `((,s . ,v) . ,binding)))
-               (loop binding* code subindex pending*)))
+         (#f (match t
+               ('num
+                (let* ((binding* `((,s . ,v) . ,binding))
+                       (code*
+                        `(,@code
+                          ((,index ,subindex) (IF (NUM? ,v)
+                                                  (,index ,(1+ subindex))
+                                                  ELSE (,(1+ index) 0)))))
+                    (subindex* (1+ subindex)))
+                  (loop binding* code* subindex* pending*)))
+               ('sym
+                (let* ((binding* `((,s . ,v) . ,binding))
+                       (code*
+                        `(,@code
+                          ((,index ,subindex) (IF (SYM? ,v)
+                                                  (,index ,(1+ subindex))
+                                                  ELSE (,(1+ index) 0)))))
+                       (subindex* (1+ subindex)))
+                  (loop binding* code* subindex* pending*)))
+               ('atm
+                (let* ((binding* `((,s . ,v) . ,binding))
+                       (code*
+                        `(,@code
+                          ((,index ,subindex) (IF (ATM? ,v)
+                                                  (,index ,(1+ subindex))
+                                                  ELSE (,(1+ index) 0)))))
+                       (subindex* (1+ subindex)))
+                  (loop binding* code* subindex* pending*)))
+               ('exp
+                (let* ((binding* `((,s . ,v) . ,binding)))
+                  (loop binding* code subindex pending*)))))
          (v* (let* ((code*
                      `(,@code
                        ((,index ,subindex) (IF (EQ? ,v ,v*)
@@ -187,7 +222,7 @@
          (loop binding code* subindex* pending**))))))
 
 
-(e.g. (compiled-clause '(('APD () ys) ys) 1)
+(e.g. (compiled-clause '(('APD () (exp ys)) ys) 1)
       ===>
       (((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
        ((1 1) (IF (EQ? (CAR *VIEW*) 'APD) (1 2) ELSE (2 0)))
@@ -198,7 +233,8 @@
        ((1 6) (LET ys (CAR (CDR (CDR *VIEW*))))
               (RETURN ys))))
 
-(e.g. (compiled-clause '(('APD (x . xs) ys) `(,x . ,(& (APD ,xs ,ys))))
+(e.g. (compiled-clause '(('APD ((exp x) . (exp xs)) (exp ys))
+                         `(,x . ,(& (APD ,xs ,ys))))
                        2)
       ===>
       (((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
@@ -214,6 +250,18 @@
               (LET (V 0) (CALL (0) *VIEW*))
               (RETURN (CONS x (V 0))))))
 
+(e.g. (compiled-clause '(('ADD (num n) (sym x)) (+ n x)) 5)
+      ===> (((5 0) (IF (CONS? *VIEW*) (5 1) ELSE (6 0)))
+            ((5 1) (IF (EQ? (CAR *VIEW*) 'ADD) (5 2) ELSE (6 0)))
+            ((5 2) (IF (CONS? (CDR *VIEW*)) (5 3) ELSE (6 0)))
+            ((5 3) (IF (NUM? (CAR (CDR *VIEW*))) (5 4) ELSE (6 0)))
+            ((5 4) (IF (CONS? (CDR (CDR *VIEW*))) (5 5) ELSE (6 0)))
+            ((5 5) (IF (SYM? (CAR (CDR (CDR *VIEW*)))) (5 6) ELSE (6 0)))
+            ((5 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (5 7) ELSE (6 0)))
+            ((5 7) (LET x (CAR (CDR (CDR *VIEW*))))
+                   (LET n (CAR (CDR *VIEW*)))
+                   (RETURN (+ n x)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (compiled program)
   (let* ((boot `(((0) (GOTO (0 0))))) ;; you can insert stuff there
@@ -222,8 +270,11 @@
                                 (iota (length program)))))
     (apply append `(,boot . ,compiled-clauses))))
 
-(e.g. (compiled '( (('APD () ys) ys)
-                   (('APD (x . xs) ys) `(,x . ,(& (APD ,xs ,ys)))) ))
+(e.g. (compiled '( (('APD () (exp ys))
+                    ys)
+                   (('APD ((exp x) . (exp xs)) (exp ys))
+                    `(,x . ,(& (APD ,xs ,ys))))
+                   ))
       ===> ( ((0) (GOTO (0 0)))
 
              ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
@@ -248,3 +299,40 @@
                     (LET (V 0) (CALL (0) *VIEW*))
                     (RETURN (CONS x (V 0)))) ))
 ;;;; brilliaaaaaaaaaaaaaaaaant \o/
+
+(e.g. (compiled '((('MUL 0 _) 0)
+                  (('MUL 1 (num x)) x)
+                  (('MUL (num x) (num y))
+                   (+ y (& (MUL ,(- x 1) ,y))))))
+      ===> (((0) (GOTO (0 0)))
+
+            ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
+            ((0 1) (IF (EQ? (CAR *VIEW*) 'MUL) (0 2) ELSE (1 0)))
+            ((0 2) (IF (CONS? (CDR *VIEW*)) (0 3) ELSE (1 0)))
+            ((0 3) (IF (EQ? (CAR (CDR *VIEW*)) 0) (0 4) ELSE (1 0)))
+            ((0 4) (IF (CONS? (CDR (CDR *VIEW*))) (0 5) ELSE (1 0)))
+            ((0 5) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (0 6) ELSE (1 0)))
+            ((0 6) (RETURN 0))
+
+            ((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
+            ((1 1) (IF (EQ? (CAR *VIEW*) 'MUL) (1 2) ELSE (2 0)))
+            ((1 2) (IF (CONS? (CDR *VIEW*)) (1 3) ELSE (2 0)))
+            ((1 3) (IF (EQ? (CAR (CDR *VIEW*)) 1) (1 4) ELSE (2 0)))
+            ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
+            ((1 5) (IF (NUM? (CAR (CDR (CDR *VIEW*)))) (1 6) ELSE (2 0)))
+            ((1 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (1 7) ELSE (2 0)))
+            ((1 7) (LET x (CAR (CDR (CDR *VIEW*))))
+                   (RETURN x))
+
+            ((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
+            ((2 1) (IF (EQ? (CAR *VIEW*) 'MUL) (2 2) ELSE (3 0)))
+            ((2 2) (IF (CONS? (CDR *VIEW*)) (2 3) ELSE (3 0)))
+            ((2 3) (IF (NUM? (CAR (CDR *VIEW*))) (2 4) ELSE (3 0)))
+            ((2 4) (IF (CONS? (CDR (CDR *VIEW*))) (2 5) ELSE (3 0)))
+            ((2 5) (IF (NUM? (CAR (CDR (CDR *VIEW*)))) (2 6) ELSE (3 0)))
+            ((2 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (2 7) ELSE (3 0)))
+            ((2 7) (LET y (CAR (CDR (CDR *VIEW*))))
+                   (LET x (CAR (CDR *VIEW*)))
+                   (LET *VIEW* (CONS 'MUL (CONS (- x 1) (CONS y ()))))
+                   (LET (V 0) (CALL (0) *VIEW*))
+                   (RETURN (+ y (V 0))))))
