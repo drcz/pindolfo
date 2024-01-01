@@ -9,32 +9,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define t3
-'( ;; it's a nice test rly (or should we import tests? naaah)
-
-(('fold-r op e       ()) e)
-(('fold-r op e (x . xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
-
-(('cons h t) `(,h . ,t))
-(('apd xs ys) (& (fold-r cons ,ys ,xs)))
-
-((('cons*f.hd f) h t) (& (cons ,(& (,f ,h)) ,t)))
-(('map f xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
-
-(('dup x) `(,x . ,x))
-(('dbl n) (+ n n))
-))
-
-(e.g. (og:pindolf '(apd (q w e) (a s d)) t3) ===> (q w e a s d))
-(e.g. (og:pindolf '(map dbl (1 2 3)) t3) ===> (2 4 6))
-(e.g. (og:pindolf '(map dup (- 0 ^)) t3) ===> ((- . -) (0 . 0) (^ . ^)))
-
-(e.g. (run (compiled t3) '(apd (q w e) (a s d))) ===> (q w e a s d))
-(e.g. (run (compiled t3) '(map dbl (1 2 3))) ===> (2 4 6))
-(e.g. (run (compiled t3) '(map dup (- 0 ^)))
-      ===> ((- . -) (0 . 0) (^ . ^)))
-
-
 #| todo
 conceptually:
  x- shouldn't only atoms be quoted in patterns? ~> meh
@@ -108,14 +82,15 @@ conceptually:
 
 
 (define (pindolf init-expression #;wrt program)
+  ;[pretty-print `(matching ,init-expression)]
   (let try ((program* program))
     (match program*
       (() 'pndlf:NO-MATCH)
-      (((pattern expression) . program**) ;[pretty-print `(try ,pattern)]
+      (((pattern expression) . program**) ;[pretty-print `(try: ,pattern)]
        (match (matching? init-expression #;against pattern)
          (#f (try program**))
-         (binding;(pretty-print `(matched ,init-expression with ,pattern))
-                 ;(pretty-print `(binding: ,binding))
+         (binding ;(pretty-print `(matched with ,pattern))
+                  ;(pretty-print `(bndng: ,binding))
                   (value #;of expression
                          #;wrt binding
                          #;and (lambda (e) (pindolf e program)))))))))
@@ -202,7 +177,63 @@ conceptually:
 (('lookup (exp k) (((exp k) . (exp v)) . _)) `(JUST ,v))
 (('lookup (exp k) (_ . (exp bnd))) (& (lookup ,k ,bnd)))
 (('lookup _ ()) '(NONE))
+
+
+(('value ()      _ _) ())
+(('value T       _ _) 'T)
+(('value (num n) _ _) n)
+
+(('value ('quote (exp e)) _ _) e)
+(('value ('quasiquote (exp qq)) (exp bnd) (exp app))
+ (& (val-qq ,qq ,bnd ,app)))
+
+(('value ('+ (exp e) (exp e*)) (exp bnd) (exp app))
+ (+ (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
+(('value ('- (exp e) (exp e*)) (exp bnd) (exp app))
+ (- (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
+
+(('value ('& (exp a)) (exp bnd) (exp app))
+ (& (,app ,(& (val-qq ,a ,bnd ,app)))))
+
+(('value (exp k) (exp bnd) _) (& (val-lo ,k ,(& (lookup ,k ,bnd)))))
+(('val-lo (exp k) ('NONE)) `(unbound ,k))
+(('val-lo _ ('JUST (exp v))) v)
+
+(('val-qq ('unquote (exp e)) (exp bnd) (exp app))
+ (& (value ,e ,bnd ,app)))
+(('val-qq ((exp e) . (exp es)) (exp bnd) (exp app))
+ `(,(& (val-qq ,e ,bnd ,app)) . ,(& (val-qq ,es ,bnd ,app))))
+(('val-qq (exp e) _ _) e)
+
+(('pindolf (exp e) (exp prg)) (& (pindolf ,e ,prg ,prg)))
+(('pindolf (exp e) () _) `(NO-MATCH ,e))
+(('pindolf (exp e) (((exp p) (exp e*)) . (exp prg*)) (exp prg))
+ (& (pindolf* ,e ,(& (match? ,p ,e)) ,e* ,prg* ,prg)))
+
+(('pindolf* (exp e) 'NO-MATCH _ (exp prg*) (exp prg))
+ (& (pindolf ,e ,prg* ,prg)))
+
+(('pindolf* _ (exp bnd) (exp e*) _ (exp prg))
+ (& (value ,e* ,bnd (app ,prg))))
+
+((('app (exp prg)) (exp e)) (& (pindolf ,e ,prg)))
 ))
+
+
+
+(e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,t3) hohoho)
+      ===> (q w e a s d))
+
+(e.g. (pindolf `(pindolf (map dbl (1 2 3)) ,t3) hohoho)
+      ===> (2 4 6))
+
+(e.g. (pindolf `(pindolf (map dup (- 0 ^)) ,t3) hohoho)
+      ===> ((- . -) (0 . 0) (^ . ^)))
+;;;;; woooooooow!
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; + tons of tests which got us there...
 
 (e.g. (pindolf '(match? () ()) hohoho) ===> ())
 (e.g. (pindolf '(match? _ (hi)) hohoho) ===> ())
@@ -213,5 +244,26 @@ conceptually:
       ===> ((b . 3) (a . 2) (x . j)))
 (e.g. (pindolf '(match? ('match?! (sym x) 997) (match?! hi! 997)) hohoho)
       ===> ((x . hi!)))
+(e.g. (pindolf '(match? ('match?! (exp x) 997) (match?! hi! 997)) hohoho)
+      ===> ((x . hi!)))
 
+(e.g. (pindolf '(value `(hi ,(+ 2 3)) () ()) hohoho) ===> (hi 5))
+(e.g. (pindolf '(value x ((x . 23)) ()) hohoho) ===> 23)
+(e.g. (pindolf '(value (+ (- 9 6) n) ((n . 2)) ()) hohoho) ===> 5)
+
+(e.g. (pindolf '(pindolf (hi! 23)
+                         (( ('hi! (exp x)) `(,x . ,x) ))) hohoho)
+      ===> (23 . 23))
+
+(e.g. (pindolf '(pindolf (wow!)
+                         (( ('hi! (exp x)) `(,x . ,x) )
+                          ( ('wow!) (& (hi! 42))))) hohoho)
+      ===> (42 . 42))
+
+(e.g. (pindolf '(pindolf (apd (q w e) (1 2 3))
+                         ( (('apd () (exp ys)) ys)
+                           (('apd ((exp x) . (exp xs)) (exp ys))
+                            `(,x . ,(& (apd ,xs ,ys)))) ))
+               hohoho)
+      ===> (q w e 1 2 3)) ;;; yes!
 
