@@ -1,117 +1,110 @@
 (use-modules (grand scheme))
 (add-to-load-path "./")
 (define pindolf (@ (pindolf interpreter) pindolf))
-;(define og:value (@ (pindolf interpreter) value))
-;(define og:matching? (@ (pindolf interpreter) matching?))
-;(define lookup (@ (pindolf interpreter) lookup))
+(define parsed (@ (pindolf parser) parsed))
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define pinp ;; all of the sudden: PINDOLF in PINDOLF!!!
-  '(
+  (parsed '(
 ;; --- matcher -------------------------------------------------
-(('match? (exp pattern) (exp expression))
+(('match? ?pattern ?expression)
  (& (match? ,pattern ,expression ())))
 
-(('match?    ()     ()    (exp bnd)) bnd)
-(('match?    'T     'T    (exp bnd)) bnd)
-(('match?    '_     _     (exp bnd)) bnd)
-(('match? (num n) (num n) (exp bnd)) bnd)
-(('match? ('quote (exp e)) (exp e) (exp bnd)) bnd)
-(('match? ('num (sym nv)) (num e) (exp bnd)) (& (match-var ,nv ,e ,bnd)))
-(('match? ('num _ )          _       _     ) 'NO-MATCH)
-(('match? ('sym (sym sv)) (sym e) (exp bnd)) (& (match-var ,sv ,e ,bnd)))
-(('match? ('sym _ )          _        _    ) 'NO-MATCH)
-(('match? ('atm (sym av)) (atm e) (exp bnd)) (& (match-var ,av ,e ,bnd)))
-(('match? ('atm _ )          _        _    ) 'NO-MATCH)
-(('match? ('exp (sym ev)) (exp e) (exp bnd)) (& (match-var ,ev ,e ,bnd)))
-(('match? ((exp p) . (exp ps))
-          ((exp e) . (exp es))
-          (exp bnd)) (& (match?* ,(& (match? ,p ,e ,bnd)) ,ps ,es)))
+(('match? () () ?bnd) bnd)
+(('match? 'T 'T ?bnd) bnd)
+(('match? '_  _ ?bnd) bnd)
+(('match? %n %n ?bnd) bnd)
+(('match? ('quote ?e) ?e ?bnd) bnd) ; maybe $e???
+(('match? ('num $nv)  %e ?bnd) (& (match-var ,nv ,e ,bnd)))
+(('match? ('num _ )    _   _ ) 'NO-MATCH)
+(('match? ('sym $sv)  $e ?bnd) (& (match-var ,sv ,e ,bnd)))
+(('match? ('sym _ )    _   _ ) 'NO-MATCH)
+(('match? ('atm $av)  @e ?bnd) (& (match-var ,av ,e ,bnd)))
+(('match? ('atm _ )    _   _ ) 'NO-MATCH)
+(('match? ('exp $ev)  ?e ?bnd) (& (match-var ,ev ,e ,bnd)))
+(('match? (?p . ?ps) (?e . ?es) ?bnd)
+ (& (match?* ,(& (match? ,p ,e ,bnd)) ,ps ,es)))
 (('match? _ _ _) 'NO-MATCH)
 
 (('match?* 'NO-MATCH _ _) 'NO-MATCH)
-(('match?* (exp bnd) (exp p) (exp e)) (& (match? ,p ,e ,bnd)))
+(('match?* ?bnd ?p ?e) (& (match? ,p ,e ,bnd)))
 
-(('match-var (sym v) (exp e) (exp bnd))
+(('match-var $v ?e ?bnd)
  (& (match-var* ,(& (lookup ,v ,bnd)) ,v ,e ,bnd)))
 
-(('match-var* ('NONE) (exp v) (exp e) (exp bnd)) `((,v . ,e) . ,bnd))
-(('match-var* ('JUST (exp e*)) (sym v) (exp e*) (exp bnd)) bnd)
-(('match-var* ('JUST _) _ _ _) 'NO-MATCH)
+(('match-var* ('NONE)    $v ?e ?bnd) `((,v . ,e) . ,bnd))
+(('match-var* ('JUST ?e) $v ?e ?bnd) bnd)
+(('match-var* ('JUST _)   _  _   _ ) 'NO-MATCH)
 
 ;; --- bindings ------------------------------------------------
-(('lookup (exp k) (((exp k) . (exp v)) . _)) `(JUST ,v))
-(('lookup (exp k) (_ . (exp bnd))) (& (lookup ,k ,bnd)))
-(('lookup _ ()) '(NONE))
+(('lookup $k (($k . ?v) .   _ )) `(JUST ,v))
+(('lookup $k (( _ . _ ) . ?bnd)) (& (lookup ,k ,bnd)))
+(('lookup  _ ()                ) '(NONE))
 
 ;; --- evaluator -----------------------------------------------
-(('value ()      _ _) ())
-(('value T       _ _) 'T)
-(('value (num n) _ _) n)
+(('value () _ _) ())
+(('value T  _ _) 'T) ;; can be unquoted, no?
+(('value %n _ _) n)
 
-(('value ('quote (exp e)) _ _) e)
-(('value ('quasiquote (exp qq)) (exp bnd) (exp app))
- (& (val-qq ,qq ,bnd ,app)))
+(('value ('quote ?e) _ _) e) ;; again, could be $e hmm?
+(('value ('quasiquote ?qq) ?bnd ?app) (& (val-qq ,qq ,bnd ,app)))
 
-(('value ('+ (exp e) (exp e*)) (exp bnd) (exp app))
- (+ (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
-(('value ('- (exp e) (exp e*)) (exp bnd) (exp app))
- (- (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
+(('value ('+ ?e ?e*) ?bnd ?app) (+ (& (value ,e ,bnd ,app))
+                                   (& (value ,e* ,bnd ,app))))
+(('value ('- ?e ?e*) ?bnd ?app) (- (& (value ,e ,bnd ,app))
+                                   (& (value ,e* ,bnd ,app))))
 
-(('value ('& (exp a)) (exp bnd) (exp app))
- (& (,app ,(& (val-qq ,a ,bnd ,app)))))
+(('value ('& ?a) ?bnd ?app) (& (,app ,(& (val-qq ,a ,bnd ,app)))))
 
-(('value (exp k) (exp bnd) _) (& (val-lo ,k ,(& (lookup ,k ,bnd)))))
-(('val-lo (exp k) ('NONE)) `(unbound ,k))
-(('val-lo _ ('JUST (exp v))) v)
+(('value $k ?bnd _) (& (val-lo ,k ,(& (lookup ,k ,bnd)))))
+(('val-lo $k   ('NONE) ) `(unbound ,k))
+(('val-lo  _ ('JUST ?v)) v)
 
-(('val-qq ('unquote (exp e)) (exp bnd) (exp app))
- (& (value ,e ,bnd ,app)))
-(('val-qq ((exp e) . (exp es)) (exp bnd) (exp app))
- `(,(& (val-qq ,e ,bnd ,app)) . ,(& (val-qq ,es ,bnd ,app))))
-(('val-qq (exp e) _ _) e)
+(('val-qq ('unquote ?e) ?bnd ?app) (& (value ,e ,bnd ,app)))
+(('val-qq (?e . ?es)    ?bnd ?app) `(,(& (val-qq ,e ,bnd ,app))
+                                     . ,(& (val-qq ,es ,bnd ,app))))
+(('val-qq ?e _ _) e)
 
 ;; --- main interpreter ----------------------------------------
-(('pindolf (exp e) (exp prg)) (& (pindolf ,e ,prg ,prg)))
-(('pindolf (exp e) () _) `(NO-MATCH ,e))
-(('pindolf (exp e) (((exp p) (exp e*)) . (exp prg*)) (exp prg))
- (& (pindolf* ,e ,(& (match? ,p ,e)) ,e* ,prg* ,prg)))
+(('pindolf ?e ?prg) (& (pindolf ,e ,prg ,prg)))
 
-(('pindolf* (exp e) 'NO-MATCH _ (exp prg*) (exp prg))
- (& (pindolf ,e ,prg* ,prg)))
+(('pindolf ?e () _) `(NO-MATCH ,e))
+(('pindolf ?e ((?pat ?exp) . ?prg*) ?prg)
+ (& (pindolf* ,e ,(& (match? ,pat ,e)) ,exp ,prg* ,prg)))
 
-(('pindolf* _ (exp bnd) (exp e*) _ (exp prg))
- (& (value ,e* ,bnd (app ,prg))))
+(('pindolf* ?e 'NO-MATCH  _  ?prg* ?prg) (& (pindolf ,e ,prg* ,prg)))
+(('pindolf*  _    ?bnd   ?e*   _   ?prg) (& (value ,e* ,bnd (app ,prg))))
 
-((('app (exp prg)) (exp e)) (& (pindolf ,e ,prg)))
-
-))
+((('app ?prg) ?e) (& (pindolf ,e ,prg)))
+;; ------------------------------------------------------------
+)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; look!
 
 (define t3
-'(
-(('fold-r (exp op) (exp e) ()) e)
-(('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
- (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+  (parsed '(
+;; ------------------------------------------------------------
+(('fold-r ?op ?e    ()     ) e)
+(('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
 
-(('cons (exp h) (exp t)) `(,h . ,t))
-(('apd (exp xs) (exp ys)) (& (fold-r cons ,ys ,xs)))
+(('cons ?h ?t) `(,h . ,t))
+(('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
 
-((('cons*f.hd (exp f)) (exp h) (exp t)) (& (cons ,(& (,f ,h)) ,t)))
-(('map (exp f) (exp xs)) (& (fold-r (cons*f.hd ,f) () ,xs)))
+((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
+(('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
 
-(('dup (exp x)) `(,x . ,x))
-(('dbl (num n)) (+ n n))
+(('dup ?x) `(,x . ,x))
+(('dbl %n) (+ n n))
 
-(('rev (exp xs)) (& (rev ,xs ())))
-(('rev () (exp rs)) rs)
-(('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
-))
+(('rev ?xs) (& (rev ,xs ())))
+(('rev    ()      ?rs) rs)
+(('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
+;; ------------------------------------------------------------
+)))
 
 (e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,t3) pinp)
       ===> (q w e a s d))
