@@ -1,5 +1,6 @@
 (define-module (pindolf interpreter)
   #:use-module (grand scheme)
+  #:use-module (pindolf parser)
   #:export (pindolf value matching? lookup))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -77,15 +78,21 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (pindolf init-expression #;wrt program)
+  (match (parsed program)
+    (('PARSE-ERROR . msg) `(PARSE ERROR! . ,msg)) ;; XD
+    (program* (pindolf* init-expression program*))))
+;;; whatever works, anything goes...
+
+(define (pindolf* init-expression #;wrt program)
   (let try ((program* program))
     (match program*
-      (() 'pndlf:NO-MATCH)
+      (() `(NO MATCH for ,init-expression)) ;; !
       (((pattern expression) . program**)
        (match (matching? init-expression #;against pattern)
          (#f (try program**))
          (binding (value #;of expression
                          #;wrt binding
-                         #;and (lambda (e) (pindolf e program)))))))))
+                         #;and (lambda (e) (pindolf* e program)))))))))
 
 
 (define t1
@@ -93,7 +100,7 @@
      (('apd ((exp x) . (exp xs)) (exp ys)) `(,x . ,(& (apd ,xs ,ys)))) )
 )
 
-(e.g. (pindolf '(apd (q w e) (1 2 3)) t1) ===> (q w e 1 2 3))
+(e.g. (pindolf* '(apd (q w e) (1 2 3)) t1) ===> (q w e 1 2 3))
 
 (define t2
 '((('lookup (exp k) (((exp k) . (exp v)) . _)) `(JUST ,v))

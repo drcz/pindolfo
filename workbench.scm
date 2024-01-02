@@ -156,3 +156,22 @@
                pinp)
       ===> (q w e 1 2 3)) ;;; yes!
 
+;; ...ok let's see if that new stuff would prevent me from sin
+(e.g. (pindolf '(abc yolo)
+               '((('abc ?x) (& (qwe ,x)))
+                 (('qwe ?x $x) `(,x . ,y))))
+      ===> (PARSE ERROR! in cluase 1 
+                  (inconsistent types for x (sym exp))
+                  (unbound variable y)))
+;;; ok
+(e.g. (pindolf '(abc yolo)
+               '((('abc ?x) (& (qwe ,x)))
+                 (('qwe ?x ?x) `(,x . ,y))))
+      ===> (PARSE ERROR! in cluase 1 (unbound variable y))
+;;; good!
+(e.g. (pindolf '(abc yolo)
+               '((('abc ?x) (& (qwe ,x)))
+                 (('qwe ?x ?y) `(,x . ,y))))
+      ===> (NO MATCH for (qwe yolo)))
+;;; nice.
+

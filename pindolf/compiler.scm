@@ -1,5 +1,6 @@
 (define-module (pindolf compiler)
   #:use-module (grand scheme)
+  #:use-module (pindolf parser)
   #:export (compiled))
 
 (define (member? x xs) (and (member x xs) #t)) ;; :)
@@ -264,16 +265,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (compiled program)
-  (let* ((boot `(((0) (GOTO (0 0))))) ;; you can insert stuff there
-         (compiled-clauses (map compiled-clause
-                                program
-                                (iota (length program)))))
-    (apply append `(,boot . ,compiled-clauses))))
+  (match (parsed program)
+    (('PARSE-ERROR . msg) `(PARSE ERROR! . ,msg)) ;; XD
+    (program*
+     (let* ((boot `(((0) (GOTO (0 0))))) ;; you can insert stuff there!
+            (compiled-clauses (map compiled-clause
+                                   program*
+                                   (iota (length program)))))
+       (apply append `(,boot . ,compiled-clauses))))))
 
-(e.g. (compiled '( (('APD () (exp ys))
-                    ys)
-                   (('APD ((exp x) . (exp xs)) (exp ys))
-                    `(,x . ,(& (APD ,xs ,ys))))
+(e.g. (compiled '( (('APD    ()      ?ys) ys)
+                   (('APD (?x . ?xs) ?ys) `(,x . ,(& (APD ,xs ,ys))))
                    ))
       ===> ( ((0) (GOTO (0 0)))
 
@@ -300,10 +302,9 @@
                     (RETURN (CONS x (V 0)))) ))
 ;;;; brilliaaaaaaaaaaaaaaaaant \o/
 
-(e.g. (compiled '((('MUL 0 _) 0)
-                  (('MUL 1 (num x)) x)
-                  (('MUL (num x) (num y))
-                   (+ y (& (MUL ,(- x 1) ,y))))))
+(e.g. (compiled '((('MUL  0  _) 0)
+                  (('MUL  1 %y) y)
+                  (('MUL %x %y) (+ y (& (MUL ,(- x 1) ,y))))))
       ===> (((0) (GOTO (0 0)))
 
             ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
@@ -321,8 +322,8 @@
             ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
             ((1 5) (IF (NUM? (CAR (CDR (CDR *VIEW*)))) (1 6) ELSE (2 0)))
             ((1 6) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (1 7) ELSE (2 0)))
-            ((1 7) (LET x (CAR (CDR (CDR *VIEW*))))
-                   (RETURN x))
+            ((1 7) (LET y (CAR (CDR (CDR *VIEW*))))
+                   (RETURN y))
 
             ((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
             ((2 1) (IF (EQ? (CAR *VIEW*) 'MUL) (2 2) ELSE (3 0)))

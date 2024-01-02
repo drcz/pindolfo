@@ -228,16 +228,16 @@
        (let* ((p* (massaged-pattern p))
               (problems (inconsistent-clause? p* e)))
          (if (> (length problems) 0)
-             `(in cluase ,clause ,problems)
+             `(PARSE-ERROR in cluase ,clause . ,problems)
              (check-parse-massage code*
                                   `(,@code++ (,p* ,e))
                                   (1+ clause)))))
       ((((? pattern?) x) . _)
-        `(SYNTAX ERROR in clause ,clause -- not an expression ,x))
+        `(PARSE-ERROR in clause ,clause -- not an expression ,x))
       (((x (? expression?)) . _)
-        `(SYNTAX ERROR in clause ,clause -- not a pattern ,x))
+        `(PARSE-ERROR in clause ,clause -- not a pattern ,x))
       (x
-       `(SYNTAX ERROR in caluse ,clause -- malformed clause ,x)))))
+        `(PARSE-ERROR in caluse ,clause -- malformed clause ,x)))))
 
 (e.g. (parsed '((('apd     ()     ?ys) ys)
                 (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys))))))
@@ -247,14 +247,14 @@
 
 (e.g. (parsed '((('foo %n %m) (+ n m))
                 (('foo $x ?xs) `(,x ,y))))
-      ===> (in cluase 1 ((unbound variable y))))
+      ===> (PARSE-ERROR in cluase 1 ((unbound variable y))))
 
 (e.g. (parsed '((('foo %n %m) (+ n m))
                 (('foo $x ?xs))))
-      ===> (SYNTAX ERROR in caluse 1
+      ===> (PARSE-ERROR in caluse 1
                    -- malformed clause ((('foo $x ?xs)))))
 
 (e.g. (parsed '((('bad %n $n) (+ n n))))
-      ===> (in cluase 0 ((inconsistent types for n (sym num)))))
+      ===> (PARSE-ERROR in cluase 0 ((inconsistent types for n (sym num)))))
 
 ;;; that should do!
