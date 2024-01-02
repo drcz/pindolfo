@@ -247,7 +247,7 @@
 
 (e.g. (parsed '((('foo %n %m) (+ n m))
                 (('foo $x ?xs) `(,x ,y))))
-      ===> (PARSE-ERROR in cluase 1 ((unbound variable y))))
+      ===> (PARSE-ERROR in cluase 1 (unbound variable y)))
 
 (e.g. (parsed '((('foo %n %m) (+ n m))
                 (('foo $x ?xs))))
@@ -255,6 +255,6 @@
                    -- malformed clause ((('foo $x ?xs)))))
 
 (e.g. (parsed '((('bad %n $n) (+ n n))))
-      ===> (PARSE-ERROR in cluase 0 ((inconsistent types for n (sym num)))))
+      ===> (PARSE-ERROR in cluase 0 (inconsistent types for n (sym num))))
 
 ;;; that should do!

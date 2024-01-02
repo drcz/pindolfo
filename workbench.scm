@@ -167,7 +167,7 @@
 (e.g. (pindolf '(abc yolo)
                '((('abc ?x) (& (qwe ,x)))
                  (('qwe ?x ?x) `(,x . ,y))))
-      ===> (PARSE ERROR! in cluase 1 (unbound variable y))
+      ===> (PARSE ERROR! in cluase 1 (unbound variable y)))
 ;;; good!
 (e.g. (pindolf '(abc yolo)
                '((('abc ?x) (& (qwe ,x)))

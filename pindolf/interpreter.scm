@@ -120,24 +120,23 @@
 
 (define t3
 '(
-(('fold-r (exp op) (exp e)       ())
- e)
-(('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
- (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+;; ------------------------------------------------------------
+(('fold-r ?op ?e    ()     ) e)
+(('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
 
-(('cons (exp h) (exp t)) `(,h . ,t))
-(('apd (exp xs) (exp ys)) (& (fold-r cons ,ys ,xs)))
+(('cons ?h ?t) `(,h . ,t))
+(('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
 
-((('cons*f.hd (exp f)) (exp h) (exp t)) (& (cons ,(& (,f ,h)) ,t)))
-(('map (exp f) (exp xs)) (& (fold-r (cons*f.hd ,f) () ,xs)))
+((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
+(('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
 
-(('dup (exp x)) `(,x . ,x))
-(('dbl (num n)) (+ n n))
+(('dup ?x) `(,x . ,x))
+(('dbl %n) (+ n n))
 
-(('rev (exp xs)) (& (rev ,xs ())))
-(('rev () (exp rs)) rs)
-(('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
-
+(('rev ?xs) (& (rev ,xs ())))
+(('rev    ()      ?rs) rs)
+(('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
+;; ------------------------------------------------------------
 ))
 
 (e.g. (pindolf '(apd (q w e) (a s d)) t3) ===> (q w e a s d))

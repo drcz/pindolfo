@@ -1,6 +1,7 @@
 (use-modules (grand scheme))
 (add-to-load-path "./")
 (define pindolf (@ (pindolf interpreter) pindolf))
+(define parsed (@ (pindolf parser) parsed))
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
 
@@ -123,89 +124,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; now for some real hardcode, DRC machine...
 
-(define p4
-  '(
-;;; abstract machine from my b.sc thesis, in CPS (stolen&redacted from CONSpiracy repo)
-
-(('id (exp x)) x) ;; for testing only
-
-#;( -- yup, cats are the bosses -- )
-(('cat         ()           (exp ys) (exp K)) (& (,K ,ys)))
-(('cat ((exp x) . (exp xs)) (exp ys) (exp K)) (& (cat ,xs ,ys (catK ,x ,K))))
-((('catK (exp x) (exp k)) (exp v)) (& (,k (,x . ,v))))
-
-#;( -- operations on dictionary (the D register) -- )
-(('name (sym k) (exp v) (exp dict) (exp K)) (& (,K ((,k . ,v) . ,dict))))
-
-(('forget (sym k) (((sym k) . _) . (exp dict)) (exp K)) (& (,K ,dict)))
-(('forget (sym k) (   (exp kv)   . (exp dict)) (exp K)) (& (forget ,k ,dict (forgetK ,kv ,K))))
-((('forgetK (exp kv) (exp K)) (exp x)) (& (,K (,kv . ,x))))
-
-(('lookup (sym k) (((sym k) . (exp v)) . _) (exp K)) (& (,K ,v)))
-(('lookup (sym k) (_ . (exp dict))          (exp K)) (& (lookup ,k ,dict ,K)))
-
-#;( -- the machine proper starts here -- )
-(('run-drc (exp program) (exp inputs)) (& (=>* () ,inputs ,program)))
-
-#;(- STORE, or operating on D -)
-(('=>* (exp D) ((exp e) . (exp R)) ( ('NAME (sym n))  . (exp C))) (& (name ,n ,e ,D (=>*DK ,R ,C))))
-(('=>* (exp D)    (exp R)          (('FORGET (sym n)) . (exp C))) (& (forget ,n ,D (=>*DK ,R ,C))))
-(('=>* (exp D)    (exp R)          (('LOOKUP (sym n)) . (exp C))) (& (lookup ,n ,D (=>*RK ,D ,R ,C))))
-
-#;(- ...plus its three little continuations -)
-((('=>*DK (exp R) (exp C)) (exp D)) (& (=>* ,D ,R ,C)))
-((('=>*CK (exp R) (exp D)) (exp C)) (& (=>* ,D ,R ,C)))
-((('=>*RK (exp D) (exp R) (exp C)) (exp r)) (& (=>* ,D (,r . ,R) ,C)))
-
-#;(- CONSTANTS AND OPS, or operating on R -)
-(('=>* (exp D) (exp R) (('CONST (exp e)) . (exp C))) (& (=>* ,D (,e . ,R) ,C)))
-(('=>* (exp D) (exp R) ( ('PROC (exp p)) . (exp C))) (& (=>* ,D (,p . ,R) ,C)))
-
-(('=>* (exp D) ( (exp h) (exp t) . (exp R)) (('CONS) . (exp C))) (& (=>* ,D ((,h . ,t) . ,R) ,C)))
-
-(('=>* (exp D) (((exp h) . (exp t)) . (exp R)) ( ('CAR) . (exp C))) (& (=>* ,D (,h . ,R) ,C)))
-(('=>* (exp D) (((exp h) . (exp t)) . (exp R)) ( ('CDR) . (exp C))) (& (=>* ,D (,t . ,R) ,C)))
-
-(('=>* (exp D) ((exp e) (exp e) . (exp R))     (('EQ?) . (exp C))) (& (=>* ,D (T  . ,R) ,C)))
-(('=>* (exp D) (   _       _    . (exp R))     (('EQ?) . (exp C))) (& (=>* ,D (() . ,R) ,C)))
-
-(('=>* (exp D) (((exp h) . (exp t)) . (exp R)) (('ATOM?) . (exp C))) (& (=>* ,D (() . ,R) ,C)))
-(('=>* (exp D) (         _          . (exp R)) (('ATOM?) . (exp C))) (& (=>* ,D (T  . ,R) ,C)))
-
-#;(- CONTROL FLOW, or operating on C -)
-(('=>* (exp D) (() . (exp R)) (('SELECT (exp p) (exp p*)) . (exp C))) (& (cat ,p* ,C (=>*CK ,R ,D))))
-(('=>* (exp D) (_  . (exp R)) (('SELECT (exp p) (exp p*)) . (exp C))) (& (cat ,p ,C (=>*CK ,R ,D))))
-
-(('=>* (exp D) ((exp p) . (exp R)) (('APPLY) . (exp C))) (& (cat ,p ,C (=>*CK ,R ,D))))
-
-#;(- halting? not a problem! -)
-(('=>* (exp D) ((exp e) . (exp R)) ()) e) ;;; could require (e) in R position actually?
-
-#;(- example program, ofc it concatenates two lists -)
-(('mk-example) `((PROC ((NAME xs)
-                        (NAME ys)
-                        (LOOKUP xs)
-                        (CONST ())
-                        (EQ?)
-                        (SELECT ((LOOKUP ys))
-                                ((LOOKUP ys)
-                                 (LOOKUP xs)
-                                 (CDR)
-                                 (LOOKUP apd)
-                                 (APPLY)
-                                 (LOOKUP xs)
-                                 (CAR)
-                                 (CONS)))
-                        (FORGET ys)
-                        (FORGET xs)))
-                 (NAME apd)
-                 (LOOKUP apd)
-                 (APPLY)))
-
-(('run-test) (& (run-drc ,(& (mk-example)) ((q w e) (a s d)))))
-(('run-test2 (exp xs) (exp ys)) (& (run-drc ,(& (mk-example)) (,xs ,ys))))
-
-))
+(define p4 (with-input-from-file "DRC-machine.sexp" read))
 
 (e.g. (pindolf '(run-test) p4) ===> (q w e a s d))
 (e.g. (pindolf '(run-test2 (it does) (work indeed)) p4)
@@ -309,108 +228,30 @@
 ;;; and just a little more hardcode: pindolf in pindolf
 
 (define pinp ;; all of the sudden: PINDOLF in PINDOLF!!!
-  '(
-;; --- matcher -------------------------------------------------
-(('match? (exp pattern) (exp expression))
- (& (match? ,pattern ,expression ())))
-
-(('match?    ()     ()    (exp bnd)) bnd)
-(('match?    'T     'T    (exp bnd)) bnd)
-(('match?    '_     _     (exp bnd)) bnd)
-(('match? (num n) (num n) (exp bnd)) bnd)
-(('match? ('quote (exp e)) (exp e) (exp bnd)) bnd)
-(('match? ('num (sym nv)) (num e) (exp bnd)) (& (match-var ,nv ,e ,bnd)))
-(('match? ('num _ )          _       _     ) 'NO-MATCH)
-(('match? ('sym (sym sv)) (sym e) (exp bnd)) (& (match-var ,sv ,e ,bnd)))
-(('match? ('sym _ )          _        _    ) 'NO-MATCH)
-(('match? ('atm (sym av)) (atm e) (exp bnd)) (& (match-var ,av ,e ,bnd)))
-(('match? ('atm _ )          _        _    ) 'NO-MATCH)
-(('match? ('exp (sym ev)) (exp e) (exp bnd)) (& (match-var ,ev ,e ,bnd)))
-(('match? ((exp p) . (exp ps))
-          ((exp e) . (exp es))
-          (exp bnd)) (& (match?* ,(& (match? ,p ,e ,bnd)) ,ps ,es)))
-(('match? _ _ _) 'NO-MATCH)
-
-(('match?* 'NO-MATCH _ _) 'NO-MATCH)
-(('match?* (exp bnd) (exp p) (exp e)) (& (match? ,p ,e ,bnd)))
-
-(('match-var (sym v) (exp e) (exp bnd))
- (& (match-var* ,(& (lookup ,v ,bnd)) ,v ,e ,bnd)))
-
-(('match-var* ('NONE) (exp v) (exp e) (exp bnd)) `((,v . ,e) . ,bnd))
-(('match-var* ('JUST (exp e*)) (sym v) (exp e*) (exp bnd)) bnd)
-(('match-var* ('JUST _) _ _ _) 'NO-MATCH)
-
-;; --- bindings ------------------------------------------------
-(('lookup (exp k) (((exp k) . (exp v)) . _)) `(JUST ,v))
-(('lookup (exp k) (_ . (exp bnd))) (& (lookup ,k ,bnd)))
-(('lookup _ ()) '(NONE))
-
-;; --- evaluator -----------------------------------------------
-(('value ()      _ _) ())
-(('value T       _ _) 'T)
-(('value (num n) _ _) n)
-
-(('value ('quote (exp e)) _ _) e)
-(('value ('quasiquote (exp qq)) (exp bnd) (exp app))
- (& (val-qq ,qq ,bnd ,app)))
-
-(('value ('+ (exp e) (exp e*)) (exp bnd) (exp app))
- (+ (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
-(('value ('- (exp e) (exp e*)) (exp bnd) (exp app))
- (- (& (value ,e ,bnd ,app)) (& (value ,e* ,bnd ,app))))
-
-(('value ('& (exp a)) (exp bnd) (exp app))
- (& (,app ,(& (val-qq ,a ,bnd ,app)))))
-
-(('value (exp k) (exp bnd) _) (& (val-lo ,k ,(& (lookup ,k ,bnd)))))
-(('val-lo (exp k) ('NONE)) `(unbound ,k))
-(('val-lo _ ('JUST (exp v))) v)
-
-(('val-qq ('unquote (exp e)) (exp bnd) (exp app))
- (& (value ,e ,bnd ,app)))
-(('val-qq ((exp e) . (exp es)) (exp bnd) (exp app))
- `(,(& (val-qq ,e ,bnd ,app)) . ,(& (val-qq ,es ,bnd ,app))))
-(('val-qq (exp e) _ _) e)
-
-;; --- main interpreter ----------------------------------------
-(('pindolf (exp e) (exp prg)) (& (pindolf ,e ,prg ,prg)))
-(('pindolf (exp e) () _) `(NO-MATCH ,e))
-(('pindolf (exp e) (((exp p) (exp e*)) . (exp prg*)) (exp prg))
- (& (pindolf* ,e ,(& (match? ,p ,e)) ,e* ,prg* ,prg)))
-
-(('pindolf* (exp e) 'NO-MATCH _ (exp prg*) (exp prg))
- (& (pindolf ,e ,prg* ,prg)))
-
-(('pindolf* _ (exp bnd) (exp e*) _ (exp prg))
- (& (value ,e* ,bnd (app ,prg))))
-
-((('app (exp prg)) (exp e)) (& (pindolf ,e ,prg)))
-
-))
+  (with-input-from-file "pindolf-self-interpreter.sexp" read))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; look!
 
-(define t3
-'(
-(('fold-r (exp op) (exp e) ()) e)
-(('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
- (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+(define t3 (parsed '(
+;; ------------------------------------------------------------
+(('fold-r ?op ?e    ()     ) e)
+(('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
 
-(('cons (exp h) (exp t)) `(,h . ,t))
-(('apd (exp xs) (exp ys)) (& (fold-r cons ,ys ,xs)))
+(('cons ?h ?t) `(,h . ,t))
+(('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
 
-((('cons*f.hd (exp f)) (exp h) (exp t)) (& (cons ,(& (,f ,h)) ,t)))
-(('map (exp f) (exp xs)) (& (fold-r (cons*f.hd ,f) () ,xs)))
+((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
+(('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
 
-(('dup (exp x)) `(,x . ,x))
-(('dbl (num n)) (+ n n))
+(('dup ?x) `(,x . ,x))
+(('dbl %n) (+ n n))
 
-(('rev (exp xs)) (& (rev ,xs ())))
-(('rev () (exp rs)) rs)
-(('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
-))
+(('rev ?xs) (& (rev ,xs ())))
+(('rev    ()      ?rs) rs)
+(('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
+;; ------------------------------------------------------------
+)))
 
 (e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,t3) pinp)
       ===> (q w e a s d))
