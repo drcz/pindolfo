@@ -265,8 +265,18 @@
 (e.g. (pindolf `(pindolf (rev (dercz likes pindolf)) ,t3) pinp)
       ===> (pindolf likes dercz))
 
-;;; how cool is that?!
+(e.g. (run (compiled pinp) `(pindolf (apd (q w e) (a s d)) ,t3))
+      ===> (q w e a s d))
 
+(e.g. (run (compiled pinp) `(pindolf (map dbl (1 2 3)) ,t3))
+      ===> (2 4 6))
+
+(e.g. (run (compiled pinp) `(pindolf (map dup (- 0 ^)) ,t3))
+      ===> ((- . -) (0 . 0) (^ . ^)))
+
+(e.g. (run (compiled pinp)  `(pindolf (rev (dercz likes pindolf)) ,t3))
+      ===> (pindolf likes dercz))
+;;; how cool is that?!
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; + tons of tests which got us there...

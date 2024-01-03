@@ -26,6 +26,7 @@
       (_ '())))
   (match expression
     (() '())
+    ('T '())
     ((? symbol?) '())
     ((? number?) '())
     (('quote _) '())
@@ -75,6 +76,7 @@
   (let cmpld ((expr expr))
     (match expr
       (() '())
+      ('T 'T)
       ((? symbol? sym) sym)
       ((? number? num) num)
       (('quote e) expr)

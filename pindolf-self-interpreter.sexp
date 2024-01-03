@@ -36,7 +36,7 @@
 
 ;; --- evaluator -----------------------------------------------
 (('value () _ _) ())
-(('value T  _ _) 'T) ;; can be unquoted, no?
+(('value 'T _ _) T)
 (('value %n _ _) n)
 
 (('value ('quote ?e) _ _) e) ;; again, could be $e hmm?
