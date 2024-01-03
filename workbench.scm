@@ -6,172 +6,147 @@
 (define run (@ (pindolf vm) run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; tiny (dynamically-scoped) lisp in pindolf.
 
-(define pinp ;; all of the sudden: PINDOLF in PINDOLF!!!
-  (parsed '(
-;; --- matcher -------------------------------------------------
-(('match? ?pattern ?expression)
- (& (match? ,pattern ,expression ())))
+(define d0
+  '(
+; ------------------------------------------------------------
+(('apd    ()      ?ys) ys)
+(('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys))))
 
-(('match? () () ?bnd) bnd)
-(('match? 'T 'T ?bnd) bnd)
-(('match? '_  _ ?bnd) bnd)
-(('match? %n %n ?bnd) bnd)
-(('match? ('quote ?e) ?e ?bnd) bnd) ; maybe $e???
-(('match? ('num $nv)  %e ?bnd) (& (match-var ,nv ,e ,bnd)))
-(('match? ('num _ )    _   _ ) 'NO-MATCH)
-(('match? ('sym $sv)  $e ?bnd) (& (match-var ,sv ,e ,bnd)))
-(('match? ('sym _ )    _   _ ) 'NO-MATCH)
-(('match? ('atm $av)  @e ?bnd) (& (match-var ,av ,e ,bnd)))
-(('match? ('atm _ )    _   _ ) 'NO-MATCH)
-(('match? ('exp $ev)  ?e ?bnd) (& (match-var ,ev ,e ,bnd)))
-(('match? (?p . ?ps) (?e . ?es) ?bnd)
- (& (match?* ,(& (match? ,p ,e ,bnd)) ,ps ,es)))
-(('match? _ _ _) 'NO-MATCH)
+(('pair () ()) ())
+(('pair (?x . ?xs) (?y . ?ys)) `((,x . ,y) . ,(& (pair ,xs ,ys))))
+; ------------------------------------------------------------
+(('lookup $k (($k . ?v) .   _ )) v)
+(('lookup $k (( _ . _ ) . ?env)) (& (lookup ,k ,env)))
 
-(('match?* 'NO-MATCH _ _) 'NO-MATCH)
-(('match?* ?bnd ?p ?e) (& (match? ,p ,e ,bnd)))
+(('updated $k ?v (($k . _) . ?env)) `((,k . ,v) . ,env))
+(('updated $k ?v (   ?kv   . ?env)) `(,kv . ,(& (updated ,k ,v ,env))))
+(('updated $k ?v ()) `((,k . ,v)))
+; ------------------------------------------------------------
+(('mul  0  _) 0)
+(('mul  1 %n) n)
+(('mul %m %n) (+ n (& (mul ,(- m 1) ,n))))
+; ------------------------------------------------------------
+(('eval () _) ())
+(('eval %n _) n)
+(('eval $s ?env) (& (lookup ,s ,env)))
+(('eval ('quote ?e) _) e)
+(('eval ('if ?p ?c ?a) ?env) (& (ev-if ,(& (eval ,p ,env)) ,c ,a ,env)))
+(('eval ('lambda ?vs ?e) ?env) `(lambda ,vs ,e)) ;; nb no closures!
+(('eval ?ap ?env) (& (apply ,(& (evlis ,ap ,env)) ,env)))
 
-(('match-var $v ?e ?bnd)
- (& (match-var* ,(& (lookup ,v ,bnd)) ,v ,e ,bnd)))
+(('ev-if ()  _ ?a ?env) (& (eval ,a ,env)))
+(('ev-if _  ?c  _ ?env) (& (eval ,c ,env)))
 
-(('match-var* ('NONE)    $v ?e ?bnd) `((,v . ,e) . ,bnd))
-(('match-var* ('JUST ?e) $v ?e ?bnd) bnd)
-(('match-var* ('JUST _)   _  _   _ ) 'NO-MATCH)
+(('evlis () ?env) ())
+(('evlis (?e . ?es) ?env) `(,(& (eval ,e ,env)) . ,(& (evlis ,es ,env))))
 
-;; --- bindings ------------------------------------------------
-(('lookup $k (($k . ?v) .   _ )) `(JUST ,v))
-(('lookup $k (( _ . _ ) . ?bnd)) (& (lookup ,k ,bnd)))
-(('lookup  _ ()                ) '(NONE))
+(('apply ('cons ?h ?t)     _) `(,h . ,t))
+(('apply ('car (?h . _ )) _) h)
+(('apply ('cdr ( _ . ?t)) _) t)
+(('apply ('eq? ?x ?x) _)  T)
+(('apply ('eq?  _ _ ) _) ())
+(('apply ('num? %n) _)  T)
+(('apply ('num?  _) _) ())
+(('apply ('sym? $s) _)  T)
+(('apply ('sym?  _) _) ())
+(('apply ('atm? @a) _)  T)
+(('apply ('atm?  _) _) ())
+(('apply ('+ %n %m) _) (+ n m))
+(('apply ('- %n %m) _) (- n m))
+(('apply ('* %n %m) _) (& (mul ,n ,m)))
+(('apply (('lambda ?vs ?e) . ?as) ?env)
+ (& (eval ,e ,(& (apd ,(& (pair ,vs ,as)) ,env)))))
 
-;; --- evaluator -----------------------------------------------
-(('value () _ _) ())
-(('value T  _ _) 'T) ;; can be unquoted, no?
-(('value %n _ _) n)
+; ------------------------------------------------------------
+(('init-env ?self-evs) (& (pair ,self-evs ,self-evs)))
 
-(('value ('quote ?e) _ _) e) ;; again, could be $e hmm?
-(('value ('quasiquote ?qq) ?bnd ?app) (& (val-qq ,qq ,bnd ,app)))
+(('run ?program) (& (run ,program
+                         ,(& (init-env (T cons car cdr + - *
+                                        eq? num? sym? atm?))))))
+(('run () _)
+ 'the-end?!) ;; should not happen...
+(('run (('def $s ?e) . ?prg) ?top)
+ (& (run ,prg ,(& (updated ,s ,(& (eval ,e ,top)) ,top)))))
+(('run (?form) ?top)
+ (& (eval ,form ,top)))
+; ------------------------------------------------------------
+))
 
-(('value ('+ ?e ?e*) ?bnd ?app) (+ (& (value ,e ,bnd ,app))
-                                   (& (value ,e* ,bnd ,app))))
-(('value ('- ?e ?e*) ?bnd ?app) (- (& (value ,e ,bnd ,app))
-                                   (& (value ,e* ,bnd ,app))))
+(e.g. (pindolf '(run ((+ (* 7 8) 3))) d0) ===> 59)
+(e.g. (pindolf '(run ((def sq (lambda (x) (* x x)))
+                      (sq (+ 2 3)))) d0) ===> 25)
+(e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
+                      (def x (+ 2 3))
+                      (! x))) d0) ===> 120)
 
-(('value ('& ?a) ?bnd ?app) (& (,app ,(& (val-qq ,a ,bnd ,app)))))
-
-(('value $k ?bnd _) (& (val-lo ,k ,(& (lookup ,k ,bnd)))))
-(('val-lo $k   ('NONE) ) `(unbound ,k))
-(('val-lo  _ ('JUST ?v)) v)
-
-(('val-qq ('unquote ?e) ?bnd ?app) (& (value ,e ,bnd ,app)))
-(('val-qq (?e . ?es)    ?bnd ?app) `(,(& (val-qq ,e ,bnd ,app))
-                                     . ,(& (val-qq ,es ,bnd ,app))))
-(('val-qq ?e _ _) e)
-
-;; --- main interpreter ----------------------------------------
-(('pindolf ?e ?prg) (& (pindolf ,e ,prg ,prg)))
-
-(('pindolf ?e () _) `(NO-MATCH ,e))
-(('pindolf ?e ((?pat ?exp) . ?prg*) ?prg)
- (& (pindolf* ,e ,(& (match? ,pat ,e)) ,exp ,prg* ,prg)))
-
-(('pindolf* ?e 'NO-MATCH  _  ?prg* ?prg) (& (pindolf ,e ,prg* ,prg)))
-(('pindolf*  _    ?bnd   ?e*   _   ?prg) (& (value ,e* ,bnd (app ,prg))))
-
-((('app ?prg) ?e) (& (pindolf ,e ,prg)))
-;; ------------------------------------------------------------
-)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; look!
-
-(define t3
-  (parsed '(
-;; ------------------------------------------------------------
-(('fold-r ?op ?e    ()     ) e)
-(('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
-
-(('cons ?h ?t) `(,h . ,t))
-(('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
-
-((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
-(('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
-
-(('dup ?x) `(,x . ,x))
-(('dbl %n) (+ n n))
-
-(('rev ?xs) (& (rev ,xs ())))
-(('rev    ()      ?rs) rs)
-(('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
-;; ------------------------------------------------------------
-)))
-
-(e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,t3) pinp)
-      ===> (q w e a s d))
-
-(e.g. (pindolf `(pindolf (map dbl (1 2 3)) ,t3) pinp)
-      ===> (2 4 6))
-
-(e.g. (pindolf `(pindolf (map dup (- 0 ^)) ,t3) pinp)
-      ===> ((- . -) (0 . 0) (^ . ^)))
-
-(e.g. (pindolf `(pindolf (rev (dercz likes pindolf)) ,t3) pinp)
-      ===> (pindolf likes dercz))
-
-;;; how cool is that?!
+(e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
+                      (def !s (lambda (ns)
+                                (if (eq? ns ())
+                                    ()
+                                    (cons (! (car ns)) (!s (cdr ns))))))
+                      (def iot (lambda (n)
+                                 (if (eq? n 0)
+                                     ()
+                                     (cons n (iot (- n 1))))))
+                      (!s (iot 6))))
+               d0) ===> (720 120 24 6 2 1))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;; + tons of tests which got us there...
+(e.g. (run (compiled d0)
+           '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
+                  (def !s (lambda (ns)
+                            (if (eq? ns ())
+                                ()
+                                (cons (! (car ns)) (!s (cdr ns))))))
+                  (def iot (lambda (n)
+                             (if (eq? n 0)
+                                 ()
+                                 (cons n (iot (- n 1))))))
+                  (!s (iot 6)))))
+      ===> (720 120 24 6 2 1))
 
-(e.g. (pindolf '(match? () ()) pinp) ===> ())
-(e.g. (pindolf '(match? _ (hi)) pinp) ===> ())
-(e.g. (pindolf '(match? 2 2) pinp) ===> ())
-(e.g. (pindolf '(match? 2 3) pinp) ===> NO-MATCH)
-(e.g. (pindolf '(match? (num n) 23) pinp) ===> ((n . 23)))
-(e.g. (pindolf '(match? ((sym x) (num a) (num b)) (j 2 3)) pinp)
-      ===> ((b . 3) (a . 2) (x . j)))
-(e.g. (pindolf '(match? ('match?! (sym x) 997) (match?! hi! 997)) pinp)
-      ===> ((x . hi!)))
-(e.g. (pindolf '(match? ('match?! (exp x) 997) (match?! hi! 997)) pinp)
-      ===> ((x . hi!)))
+;;; ...ok, and now pindolf running pindolf running lisp omg
+(define pinp (with-input-from-file "pindolf-self-interpreter.sexp" read))
 
-(e.g. (pindolf '(value `(hi ,(+ 2 3)) () ()) pinp) ===> (hi 5))
-(e.g. (pindolf '(value x ((x . 23)) ()) pinp) ===> 23)
-(e.g. (pindolf '(value (+ (- 9 6) n) ((n . 2)) ()) pinp) ===> 5)
+(e.g. (pindolf
+       `(pindolf 
+         (run ((def ! (lambda (n)
+                        (if (eq? n 0)
+                            1
+                            (* n (! (- n 1))))))
+               (def !s (lambda (ns)
+                         (if (eq? ns ())
+                             ()
+                             (cons (! (car ns)) (!s (cdr ns))))))
+               (def iot (lambda (n)
+                          (if (eq? n 0)
+                              ()
+                              (cons n (iot (- n 1))))))
+               (!s (iot 6))))
+         ,(parsed d0))
+       pinp) ===> (720 120 24 6 2 1))
 
-(e.g. (pindolf '(pindolf (hi! 23)
-                         (( ('hi! (exp x)) `(,x . ,x) ))) pinp)
-      ===> (23 . 23))
+;;; whoa! didn't even expect it to work!
 
-(e.g. (pindolf '(pindolf (wow!)
-                         (( ('hi! (exp x)) `(,x . ,x) )
-                          ( ('wow!) (& (hi! 42))))) pinp)
-      ===> (42 . 42))
-
-(e.g. (pindolf '(pindolf (apd (q w e) (1 2 3))
-                         ( (('apd () (exp ys)) ys)
-                           (('apd ((exp x) . (exp xs)) (exp ys))
-                            `(,x . ,(& (apd ,xs ,ys)))) ))
-               pinp)
-      ===> (q w e 1 2 3)) ;;; yes!
-
-;; ...ok let's see if that new stuff would prevent me from sin
-(e.g. (pindolf '(abc yolo)
-               '((('abc ?x) (& (qwe ,x)))
-                 (('qwe ?x $x) `(,x . ,y))))
-      ===> (PARSE ERROR! in cluase 1 
-                  (inconsistent types for x (sym exp))
-                  (unbound variable y)))
-;;; ok
-(e.g. (pindolf '(abc yolo)
-               '((('abc ?x) (& (qwe ,x)))
-                 (('qwe ?x ?x) `(,x . ,y))))
-      ===> (PARSE ERROR! in cluase 1 (unbound variable y)))
-;;; good!
-(e.g. (pindolf '(abc yolo)
-               '((('abc ?x) (& (qwe ,x)))
-                 (('qwe ?x ?y) `(,x . ,y))))
-      ===> (NO MATCH for (qwe yolo)))
-;;; nice.
-
+(e.g. (run (compiled pinp)
+           `(pindolf 
+             (run ((def ! (lambda (n)
+                            (if (eq? n 0)
+                                1
+                                (* n (! (- n 1))))))
+                   (def !s (lambda (ns)
+                             (if (eq? ns ())
+                                 ()
+                                 (cons (! (car ns)) (!s (cdr ns))))))
+                   (def iot (lambda (n)
+                              (if (eq? n 0)
+                                  ()
+                                  (cons n (iot (- n 1))))))
+                   (!s (iot 3))))
+             ,(parsed d0)))
+      ===> (6 2 1))
+;;; the above takes ~1.5min hehe.
+;;; btw notice there's no multiplication in pindolf, so it acutally
+;;; uses Peano/Dedekind recursive formula on each step!
