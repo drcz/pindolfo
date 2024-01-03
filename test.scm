@@ -124,69 +124,69 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; now for some real hardcode, DRC machine...
 
-(define p4 (with-input-from-file "DRC-machine.sexp" read))
+(define drc (with-input-from-file "DRC-machine.sexp" read))
 
-(e.g. (pindolf '(run-test) p4) ===> (q w e a s d))
-(e.g. (pindolf '(run-test2 (it does) (work indeed)) p4)
+(e.g. (pindolf '(run-test) drc) ===> (q w e a s d))
+(e.g. (pindolf '(run-test2 (it does) (work indeed)) drc)
       ===> (it does work indeed))
 
-(e.g. (run (compiled p4) '(run-test)) ===> (q w e a s d))
-(e.g. (run (compiled p4) '(run-test2 (it does) (work indeed)))
+(e.g. (run (compiled drc) '(run-test)) ===> (q w e a s d))
+(e.g. (run (compiled drc) '(run-test2 (it does) (work indeed)))
       ===> (it does work indeed))
 
 ;;; todo: actually lisp (drcz0) compiled to DRC might be funny
 
-
 ;;;;;;; hasiok/trash ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;;; (maybe these tests will be useful once more, who knows)
 
 ;;; testing one procedure at a time:
-(e.g. (pindolf '(cat (q w e) (1 2 3) id) p4)
+(e.g. (pindolf '(cat (q w e) (1 2 3) id) drc)
       ===> (q w e 1 2 3))
-(e.g. (pindolf '(name J 23 ((ans . 42)) id) p4)
+(e.g. (pindolf '(name J 23 ((ans . 42)) id) drc)
       ===> ((J . 23) (ans . 42)))
-(e.g. (pindolf '(forget ans ((J . 23) (ans . 42)) id) p4)
+(e.g. (pindolf '(forget ans ((J . 23) (ans . 42)) id) drc)
       ===> ((J . 23)))
-(e.g. (pindolf '(forget J ((J . 23) (ans . 42)) id) p4)
+(e.g. (pindolf '(forget J ((J . 23) (ans . 42)) id) drc)
       ===> ((ans . 42)))
-(e.g. (pindolf '(lookup J ((J . 23) (ans . 42)) id) p4)
+(e.g. (pindolf '(lookup J ((J . 23) (ans . 42)) id) drc)
       ===> 23)
-(e.g. (pindolf '(lookup ans ((J . 23) (ans . 42)) id) p4)
+(e.g. (pindolf '(lookup ans ((J . 23) (ans . 42)) id) drc)
       ===> 42)
 ;;; ok, more like testing one functionality at a time...
-(e.g. (pindolf '(run-drc ((CONST 23) (CONST 42) (CONS)) ()) p4)
+(e.g. (pindolf '(run-drc ((CONST 23) (CONST 42) (CONS)) ()) drc)
       ===> (42 . 23))
-(e.g. (pindolf '(run-drc ((CONS)) (23 42)) p4)
+(e.g. (pindolf '(run-drc ((CONS)) (23 42)) drc)
       ===> (23 . 42))
 (e.g. (pindolf '(run-drc ((NAME ans)
                           (LOOKUP ans)
                           (LOOKUP ans)
                           (CONS))
-                         (42)) p4) ===> (42 . 42))
+                         (42)) drc) ===> (42 . 42))
 (e.g. (pindolf '(run-drc ((NAME ans)
                           (LOOKUP ans)
                           (LOOKUP ans)
                           (EQ?))
-                         (42)) p4) ===> T)
+                         (42)) drc) ===> T)
 (e.g. (pindolf '(run-drc ((NAME ans)
                           (LOOKUP ans)
                           (LOOKUP ans)
                           (LOOKUP ans)
                           (CONS)
                           (EQ?))
-                         (42)) p4) ===> ())
+                         (42)) drc) ===> ())
 (e.g. (pindolf '(run-drc ((NAME a)
                           (LOOKUP a)
                           (FORGET a))
-                         (42)) p4) ===> 42)
+                         (42)) drc) ===> 42)
 (e.g. (pindolf '(run-drc ((PROC ((NAME a)
                                  (LOOKUP a)
                                  (LOOKUP a)
                                  (CONS)
                                  (FORGET a)))
                           (APPLY))
-                         (he)) p4) ===> (he . he))
+                         (he)) drc) ===> (he . he))
 
 (e.g. (pindolf '(run-drc ((PROC ((NAME a)
                                  (LOOKUP a)
@@ -196,7 +196,7 @@
                           (NAME dbl)
                           (LOOKUP dbl)
                           (APPLY))
-                         (hi)) p4) ===> (hi . hi))
+                         (hi)) drc) ===> (hi . hi))
 
 ;;; finally! silly errors in silly old repos lol.
 (e.g. (pindolf '(run-drc ((PROC ((NAME xs)
@@ -217,11 +217,11 @@
                                  (FORGET xs)))
                           (NAME apd)
                           (LOOKUP apd)
-                          (APPLY)) ((q w e) (a s d))) p4)
+                          (APPLY)) ((q w e) (a s d))) drc)
       ===> (q w e a s d))
 
 
-(pretty-print `(tests for p4 (DRC machine) passed))
+(pretty-print `(tests for DRC machine passed))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -314,6 +314,137 @@
       ===> (q w e 1 2 3)) ;;; yes!
 
 (pretty-print `(tests for pinp (pindolf in pindolf) passed))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define lip (with-input-from-file "lisp0.sexp" read))
+(e.g. (pindolf '(example) lip) ===> 24)
+
+(e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
+                      (def !s (lambda (ns)
+                                (if (eq? ns ())
+                                    ()
+                                    (cons (! (car ns)) (!s (cdr ns))))))
+                      (def iot (lambda (n)
+                                 (if (eq? n 0)
+                                     ()
+                                     (cons n (iot (- n 1))))))
+                      (!s (iot 6))))
+               lip) ===> (720 120 24 6 2 1))
+
+(e.g. (run (compiled lip)
+           '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
+                  (def !s (lambda (ns)
+                            (if (eq? ns ())
+                                ()
+                                (cons (! (car ns)) (!s (cdr ns))))))
+                  (def iot (lambda (n)
+                             (if (eq? n 0)
+                                 ()
+                                 (cons n (iot (- n 1))))))
+                  (!s (iot 6)))))
+      ===> (720 120 24 6 2 1))
+
+(pretty-print `(tests for lip (LISP in pindolf) passed))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(e.g. (pindolf
+       `(pindolf 
+         (run-drc ((PROC ((NAME xs)
+                          (NAME ys)
+                          (LOOKUP xs)
+                          (CONST ())
+                          (EQ?)
+                          (SELECT ((LOOKUP ys))
+                                  ((LOOKUP ys)
+                                   (LOOKUP xs)
+                                   (CDR)
+                                   (LOOKUP apd)
+                                   (APPLY)
+                                   (LOOKUP xs)
+                                   (CAR)
+                                   (CONS)))
+                          (FORGET ys)
+                          (FORGET xs)))
+                   (NAME apd)
+                   (LOOKUP apd)
+                   (APPLY)) ((q w e) (a s d)))
+       ,(parsed drc))
+       pinp) ===> (q w e a s d))
+
+(e.g. (run (compiled pinp)
+           `(pindolf 
+             (run-drc ((PROC ((NAME xs)
+                              (NAME ys)
+                              (LOOKUP xs)
+                              (CONST ())
+                              (EQ?)
+                              (SELECT ((LOOKUP ys))
+                                      ((LOOKUP ys)
+                                       (LOOKUP xs)
+                                       (CDR)
+                                       (LOOKUP apd)
+                                       (APPLY)
+                                       (LOOKUP xs)
+                                       (CAR)
+                                       (CONS)))
+                              (FORGET ys)
+                              (FORGET xs)))
+                       (NAME apd)
+                       (LOOKUP apd)
+                       (APPLY)) ((q w e) (a s d)))
+             ,(parsed drc)))
+      ===> (q w e a s d))
+;;; ok just to make sure you're following: the above is guile scheme
+;;; running FCL* interpreter running compiled pindolf interpreting
+;;; [another] pindolf interpreting DRC machine running apd program.
+;;; such language towers (towels???) make sense since they reveal
+;;; pretty non-trivial bugs.
+
+(pretty-print `(tests for DRC in pinp (!!) passed))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(e.g. (pindolf
+       `(pindolf 
+         (run ((def ! (lambda (n)
+                        (if (eq? n 0)
+                            1
+                            (* n (! (- n 1))))))
+               (def !s (lambda (ns)
+                         (if (eq? ns ())
+                             ()
+                             (cons (! (car ns)) (!s (cdr ns))))))
+               (def iot (lambda (n)
+                          (if (eq? n 0)
+                              ()
+                              (cons n (iot (- n 1))))))
+               (!s (iot 6))))
+         ,(parsed lip))
+       pinp) ===> (720 120 24 6 2 1))
+
+(e.g. (run (compiled pinp)
+           `(pindolf 
+             (run ((def ! (lambda (n)
+                            (if (eq? n 0)
+                                1
+                                (* n (! (- n 1))))))
+                   (def !s (lambda (ns)
+                             (if (eq? ns ())
+                                 ()
+                                 (cons (! (car ns)) (!s (cdr ns))))))
+                   (def iot (lambda (n)
+                              (if (eq? n 0)
+                                  ()
+                                  (cons n (iot (- n 1))))))
+                   (!s (iot 3))))
+             ,(parsed lip)))
+      ===> (6 2 1))
+;;; ok, again: guile's running FCL* running compiled pindolf, interpreting
+;;; [another] pindolf, interpreting LISP interpreter running some program.
+;;; yes, it takes ~1.5min -- notice there's no multiplication in pindolf,
+;;; it acutally uses Peano/Dedekind recursive formula on each step!
+
+(pretty-print `(test for lip in pinp (!!!) passed))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
