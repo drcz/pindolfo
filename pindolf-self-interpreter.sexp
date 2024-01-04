@@ -46,6 +46,8 @@
                                    (& (value ,e* ,bnd ,app))))
 (('value ('- ?e ?e*) ?bnd ?app) (- (& (value ,e ,bnd ,app))
                                    (& (value ,e* ,bnd ,app))))
+(('value ('* ?e ?e*) ?bnd ?app) (* (& (value ,e ,bnd ,app))
+                                   (& (value ,e* ,bnd ,app))))
 
 (('value ('& ?a) ?bnd ?app) (& (,app ,(& (val-qq ,a ,bnd ,app)))))
 

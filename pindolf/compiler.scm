@@ -33,6 +33,7 @@
     (('quasiquote qq) (applications-in-qq qq))
     (('+ e e*) (append (applications-in e) (applications-in e*)))
     (('- e e*) (append (applications-in e) (applications-in e*)))
+    (('* e e*) (append (applications-in e) (applications-in e*)))
     (('& e) (append (applications-in-qq e) `(,expression)))))
 
 (e.g. (applications-in '`(,x . ,(& (APD ,xs ,ys))))
@@ -83,6 +84,7 @@
       (('quasiquote qq) (cons<-quasiquote qq cmpld))
       (('+ e e*) `(+ ,(cmpld e) ,(cmpld e*)))
       (('- e e*) `(- ,(cmpld e) ,(cmpld e*)))
+      (('* e e*) `(* ,(cmpld e) ,(cmpld e*)))
       (('& e) (lookup expr vars-for-apps))
       #;err??)))
 

@@ -31,10 +31,12 @@
       (('quasiquote expr) (value-qq expr))
       (('+ e e*) (+ (value* e) (value* e*)))
       (('- e e*) (- (value* e) (value* e*)))
+      (('* e e*) (* (value* e) (value* e*)))
       (('& expr) (app (value-qq expr)))
      (_ 'ERROR))))
 
 (e.g. (value '23 '() '_) ===> 23)
+(e.g. (value '(* 7 8) '() '_) ===> 56)
 (e.g. (value ''bonjour '((x . whatever)) '_) ===> bonjour)
 (e.g. (value '(+ 2 (- 100 x)) '((x . 97)) '_) ===> 5)
 (e.g. (value '`(,a ,b) '((a . hi) (b . there)) 'whatever)

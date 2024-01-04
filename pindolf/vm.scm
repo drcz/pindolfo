@@ -47,6 +47,7 @@
     (('quote e) e)
     (('+ e e*) (+ (value e binding) (value e* binding)))
     (('- e e*) (- (value e binding) (value e* binding)))
+    (('* e e*) (* (value e binding) (value e* binding)))
     (('CONS e e*) (cons (value e binding) (value e* binding)))
     (('CAR e) (car (value e binding)))
     (('CDR e) (cdr (value e binding)))

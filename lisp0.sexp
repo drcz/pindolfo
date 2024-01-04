@@ -15,10 +15,6 @@
 (('updated $k ?v (   ?kv   . ?env)) `(,kv . ,(& (updated ,k ,v ,env))))
 (('updated $k ?v ()) `((,k . ,v)))
 ; ------------------------------------------------------------
-(('mul  0  _) 0)
-(('mul  1 %n) n)
-(('mul %m %n) (+ n (& (mul ,(- m 1) ,n))))
-; ------------------------------------------------------------
 (('eval () _) ())
 (('eval %n _) n)
 (('eval $s ?env) (& (lookup ,s ,env)))
@@ -46,7 +42,7 @@
 (('apply ('atm?  _) _) ())
 (('apply ('+ %n %m) _) (+ n m))
 (('apply ('- %n %m) _) (- n m))
-(('apply ('* %n %m) _) (& (mul ,n ,m)))
+(('apply ('* %n %m) _) (* n m))
 (('apply (('lambda ?vs ?e) . ?as) ?env)
  (& (eval ,e ,(& (apd ,(& (pair ,vs ,as)) ,env)))))
 

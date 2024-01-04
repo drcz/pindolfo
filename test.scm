@@ -441,9 +441,7 @@
       ===> (6 2 1))
 ;;; ok, again: guile's running FCL* running compiled pindolf, interpreting
 ;;; [another] pindolf, interpreting LISP interpreter running some program.
-;;; yes, it takes ~1.5min -- notice there's no multiplication in pindolf,
-;;; it acutally uses Peano/Dedekind recursive formula on each step!
-
+;;; yes, it takes ~1.5min.
 (pretty-print `(test for lip in pinp (!!!) passed))
 
 

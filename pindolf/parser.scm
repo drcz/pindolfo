@@ -100,6 +100,8 @@
                       (vars-in-expression e*)))
     (('- e e*) (union (vars-in-expression e)
                       (vars-in-expression e*)))
+    (('* e e*) (union (vars-in-expression e)
+                      (vars-in-expression e*)))
     (('& e) (vars-in-qq e))))
 
 (e.g. (same-set? (vars-in-expression '(+ (& (val ,e)) (& (cmp ,e*))))
@@ -209,12 +211,13 @@
     (('quasiquote qq) (correct-qq? qq))
     (('+ e e*) (and (expression? e) (expression? e*)))
     (('- e e*) (and (expression? e) (expression? e*)))
+    (('* e e*) (and (expression? e) (expression? e*)))
     (('& expr) (correct-qq? expr))
     (_ #f)))
 
 (e.g. (expression? '(- n 23)))
 (e.g. (expression? '(& (compute ,stuff ,(+ n 3)))))
-(e.g. (not (expression? '(* 2 3))))
+(e.g. (not (expression? '(/ 2 3))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (parsed code)
