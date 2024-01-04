@@ -134,7 +134,7 @@
 (e.g. (run (compiled drc) '(run-test2 (it does) (work indeed)))
       ===> (it does work indeed))
 
-;;; todo: actually lisp (drcz0) compiled to DRC might be funny
+;;; also cf lisp (drcz0) compiled to DRC a few tests below...
 
 ;;;;;;; hasiok/trash ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -446,4 +446,120 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(pretty-print '\o/)
+
+(define l2d (with-input-from-file "lisp2drc.sexp" read))
+(e.g. (pindolf '(compiled* car) l2d) ===> ((CAR)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define lisp-test
+  '((def ! (lambda (n)
+             (if (eq? n 0)
+                 1
+                 (* n (! (- n 1))))))
+    (def !s (lambda (ns)
+              (if (eq? ns ())
+                  ()
+                  (cons (! (car ns))
+                        (!s (cdr ns))))))
+    (def iot (lambda (n)
+               (if (eq? n 0)
+                   ()
+                   (cons n
+                         (iot (- n 1))))))
+    (!s (iot 4))))
+
+(e.g. (pindolf `(run ,lisp-test) lip)
+      ===> (24 6 2 1))
+
+(e.g. (run (compiled lip) `(run ,lisp-test))
+      ===> (24 6 2 1))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(e.g.(pindolf `(compiled ,lisp-test) l2d)
+      ===> ((PROC ((NAME n)
+                   (CONST 0)
+                   (LOOKUP n)
+                   (EQ?)
+                   (SELECT ((CONST 1))
+                           ((CONST 1)
+                            (LOOKUP n)
+                            (MINUS)
+                            (LOOKUP !)
+                            (APPLY)
+                            (LOOKUP n)
+                            (TIMES)))
+                   (FORGET n)))
+            (NAME !)
+            (PROC ((NAME ns)
+                   (CONST ())
+                   (LOOKUP ns)
+                   (EQ?)
+                   (SELECT ((CONST ()))
+                           ((LOOKUP ns)
+                            (CDR)
+                            (LOOKUP !s)
+                            (APPLY)
+                            (LOOKUP ns)
+                            (CAR)
+                            (LOOKUP !)
+                            (APPLY)
+                            (CONS)))
+                   (FORGET ns)))
+            (NAME !s)
+            (PROC ((NAME n)
+                   (CONST 0)
+                   (LOOKUP n)
+                   (EQ?)
+                   (SELECT ((CONST ()))
+                           ((CONST 1)
+                            (LOOKUP n)
+                            (MINUS)
+                            (LOOKUP iot)
+                            (APPLY)
+                            (LOOKUP n)
+                            (CONS)))
+                   (FORGET n)))
+            (NAME iot)
+            (CONST 4)
+            (LOOKUP iot)
+            (APPLY)
+            (LOOKUP !s)
+            (APPLY)))
+
+(e.g. (equal? (pindolf `(compiled ,lisp-test) l2d)
+              (run (compiled l2d) `(compiled ,lisp-test))))
+
+(e.g. (pindolf `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ())
+               drc) ===> (24 6 2 1))
+
+(e.g. (run (compiled drc)
+           `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ()))
+      ===> (24 6 2 1))
+;;; sweet.
+
+
+(e.g. (equal?
+       (pindolf `(pindolf (compiled ,lisp-test) ,(parsed l2d))
+                pinp)
+       (run (compiled pinp)
+            `(pindolf (compiled ,lisp-test) ,(parsed l2d)))))
+;;; takes a few seconds...
+
+(e.g. (pindolf `(pindolf (run-drc ,(pindolf `(compiled ,lisp-test) l2d)
+                                  ())
+                         ,(parsed drc))
+               pinp) ===> (24 6 2 1))
+
+(e.g. (run (compiled pinp)
+           `(pindolf (run-drc ,(pindolf `(compiled ,lisp-test) l2d)
+                              ())
+                     ,(parsed drc)))
+      ===> (24 6 2 1))
+;;; takes ~2min
+
+(write `(tests for lisp->DRC and its execution, in pinp (!!) and compiled pinp (!!!) passed))
+(newline)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(newline) (display '\o/) (newline)

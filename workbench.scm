@@ -6,147 +6,116 @@
 (define run (@ (pindolf vm) run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; tiny (dynamically-scoped) lisp in pindolf.
+(define pinp
+  (with-input-from-file "pindolf-self-interpreter.sexp" read))
 
-(define d0
-  '(
-; ------------------------------------------------------------
-(('apd    ()      ?ys) ys)
-(('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys))))
+(define lip (with-input-from-file "lisp0.sexp" read))
+(e.g. (pindolf '(example) lip) ===> 24)
 
-(('pair () ()) ())
-(('pair (?x . ?xs) (?y . ?ys)) `((,x . ,y) . ,(& (pair ,xs ,ys))))
-; ------------------------------------------------------------
-(('lookup $k (($k . ?v) .   _ )) v)
-(('lookup $k (( _ . _ ) . ?env)) (& (lookup ,k ,env)))
+(define drc (with-input-from-file "DRC-machine.sexp" read))
+(e.g. (pindolf '(run-test) drc) ===> (q w e a s d))
 
-(('updated $k ?v (($k . _) . ?env)) `((,k . ,v) . ,env))
-(('updated $k ?v (   ?kv   . ?env)) `(,kv . ,(& (updated ,k ,v ,env))))
-(('updated $k ?v ()) `((,k . ,v)))
-; ------------------------------------------------------------
-(('mul  0  _) 0)
-(('mul  1 %n) n)
-(('mul %m %n) (+ n (& (mul ,(- m 1) ,n))))
-; ------------------------------------------------------------
-(('eval () _) ())
-(('eval %n _) n)
-(('eval $s ?env) (& (lookup ,s ,env)))
-(('eval ('quote ?e) _) e)
-(('eval ('if ?p ?c ?a) ?env) (& (ev-if ,(& (eval ,p ,env)) ,c ,a ,env)))
-(('eval ('lambda ?vs ?e) ?env) `(lambda ,vs ,e)) ;; nb no closures!
-(('eval ?ap ?env) (& (apply ,(& (evlis ,ap ,env)) ,env)))
+(define l2d (with-input-from-file "lisp2drc.sexp" read))
+(e.g. (pindolf '(compiled* car) l2d) ===> ((CAR)))
 
-(('ev-if ()  _ ?a ?env) (& (eval ,a ,env)))
-(('ev-if _  ?c  _ ?env) (& (eval ,c ,env)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(('evlis () ?env) ())
-(('evlis (?e . ?es) ?env) `(,(& (eval ,e ,env)) . ,(& (evlis ,es ,env))))
+(define lisp-test
+  '((def ! (lambda (n)
+             (if (eq? n 0)
+                 1
+                 (* n (! (- n 1))))))
+    (def !s (lambda (ns)
+              (if (eq? ns ())
+                  ()
+                  (cons (! (car ns))
+                        (!s (cdr ns))))))
+    (def iot (lambda (n)
+               (if (eq? n 0)
+                   ()
+                   (cons n
+                         (iot (- n 1))))))
+    (!s (iot 6))))
 
-(('apply ('cons ?h ?t)     _) `(,h . ,t))
-(('apply ('car (?h . _ )) _) h)
-(('apply ('cdr ( _ . ?t)) _) t)
-(('apply ('eq? ?x ?x) _)  T)
-(('apply ('eq?  _ _ ) _) ())
-(('apply ('num? %n) _)  T)
-(('apply ('num?  _) _) ())
-(('apply ('sym? $s) _)  T)
-(('apply ('sym?  _) _) ())
-(('apply ('atm? @a) _)  T)
-(('apply ('atm?  _) _) ())
-(('apply ('+ %n %m) _) (+ n m))
-(('apply ('- %n %m) _) (- n m))
-(('apply ('* %n %m) _) (& (mul ,n ,m)))
-(('apply (('lambda ?vs ?e) . ?as) ?env)
- (& (eval ,e ,(& (apd ,(& (pair ,vs ,as)) ,env)))))
-
-; ------------------------------------------------------------
-(('init-env ?self-evs) (& (pair ,self-evs ,self-evs)))
-
-(('run ?program) (& (run ,program
-                         ,(& (init-env (T cons car cdr + - *
-                                        eq? num? sym? atm?))))))
-(('run () _)
- 'the-end?!) ;; should not happen...
-(('run (('def $s ?e) . ?prg) ?top)
- (& (run ,prg ,(& (updated ,s ,(& (eval ,e ,top)) ,top)))))
-(('run (?form) ?top)
- (& (eval ,form ,top)))
-; ------------------------------------------------------------
-))
-
-(e.g. (pindolf '(run ((+ (* 7 8) 3))) d0) ===> 59)
-(e.g. (pindolf '(run ((def sq (lambda (x) (* x x)))
-                      (sq (+ 2 3)))) d0) ===> 25)
-(e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
-                      (def x (+ 2 3))
-                      (! x))) d0) ===> 120)
-
-(e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
-                      (def !s (lambda (ns)
-                                (if (eq? ns ())
-                                    ()
-                                    (cons (! (car ns)) (!s (cdr ns))))))
-                      (def iot (lambda (n)
-                                 (if (eq? n 0)
-                                     ()
-                                     (cons n (iot (- n 1))))))
-                      (!s (iot 6))))
-               d0) ===> (720 120 24 6 2 1))
-
-
-(e.g. (run (compiled d0)
-           '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
-                  (def !s (lambda (ns)
-                            (if (eq? ns ())
-                                ()
-                                (cons (! (car ns)) (!s (cdr ns))))))
-                  (def iot (lambda (n)
-                             (if (eq? n 0)
-                                 ()
-                                 (cons n (iot (- n 1))))))
-                  (!s (iot 6)))))
+(e.g. (pindolf `(run ,lisp-test) lip)
       ===> (720 120 24 6 2 1))
 
-;;; ...ok, and now pindolf running pindolf running lisp omg
-(define pinp (with-input-from-file "pindolf-self-interpreter.sexp" read))
+(e.g. (run (compiled lip) `(run ,lisp-test))
+      ===> (720 120 24 6 2 1))
 
-(e.g. (pindolf
-       `(pindolf 
-         (run ((def ! (lambda (n)
-                        (if (eq? n 0)
-                            1
-                            (* n (! (- n 1))))))
-               (def !s (lambda (ns)
-                         (if (eq? ns ())
-                             ()
-                             (cons (! (car ns)) (!s (cdr ns))))))
-               (def iot (lambda (n)
-                          (if (eq? n 0)
-                              ()
-                              (cons n (iot (- n 1))))))
-               (!s (iot 6))))
-         ,(parsed d0))
-       pinp) ===> (720 120 24 6 2 1))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(e.g.(pindolf `(compiled ,lisp-test) l2d)
+      ===> ((PROC ((NAME n)
+                   (CONST 0)
+                   (LOOKUP n)
+                   (EQ?)
+                   (SELECT ((CONST 1))
+                           ((CONST 1)
+                            (LOOKUP n)
+                            (MINUS)
+                            (LOOKUP !)
+                            (APPLY)
+                            (LOOKUP n)
+                            (TIMES)))
+                   (FORGET n)))
+            (NAME !)
+            (PROC ((NAME ns)
+                   (CONST ())
+                   (LOOKUP ns)
+                   (EQ?)
+                   (SELECT ((CONST ()))
+                           ((LOOKUP ns)
+                            (CDR)
+                            (LOOKUP !s)
+                            (APPLY)
+                            (LOOKUP ns)
+                            (CAR)
+                            (LOOKUP !)
+                            (APPLY)
+                            (CONS)))
+                   (FORGET ns)))
+            (NAME !s)
+            (PROC ((NAME n)
+                   (CONST 0)
+                   (LOOKUP n)
+                   (EQ?)
+                   (SELECT ((CONST ()))
+                           ((CONST 1)
+                            (LOOKUP n)
+                            (MINUS)
+                            (LOOKUP iot)
+                            (APPLY)
+                            (LOOKUP n)
+                            (CONS)))
+                   (FORGET n)))
+            (NAME iot)
+            (CONST 6)
+            (LOOKUP iot)
+            (APPLY)
+            (LOOKUP !s)
+            (APPLY)))
 
-;;; whoa! didn't even expect it to work!
+(e.g. (equal? (pindolf `(compiled ,lisp-test) l2d)
+              (run (compiled l2d) `(compiled ,lisp-test))))
 
-(e.g. (run (compiled pinp)
-           `(pindolf 
-             (run ((def ! (lambda (n)
-                            (if (eq? n 0)
-                                1
-                                (* n (! (- n 1))))))
-                   (def !s (lambda (ns)
-                             (if (eq? ns ())
-                                 ()
-                                 (cons (! (car ns)) (!s (cdr ns))))))
-                   (def iot (lambda (n)
-                              (if (eq? n 0)
-                                  ()
-                                  (cons n (iot (- n 1))))))
-                   (!s (iot 3))))
-             ,(parsed d0)))
-      ===> (6 2 1))
-;;; the above takes ~1.5min hehe.
-;;; btw notice there's no multiplication in pindolf, so it acutally
-;;; uses Peano/Dedekind recursive formula on each step!
+(e.g. (pindolf `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ())
+               drc) ===> (720 120 24 6 2 1))
+
+(e.g. (run (compiled drc)
+           `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ()))
+      ===> (720 120 24 6 2 1))
+;;; sweet.
+
+
+(e.g. (equal?
+       (pindolf `(pindolf (compiled ,lisp-test) ,(parsed l2d))
+                pinp)
+       (run (compiled pinp)
+            `(pindolf (compiled ,lisp-test) ,(parsed l2d)))))
+;;; takes 15-20s...
+
+(e.g. (pindolf `(pindolf (run-drc ,(pindolf `(compiled ,lisp-test) l2d)
+                                  ())
+                         ,(parsed drc))
+               pinp) ===> (720 120 24 6 2 1))
+
