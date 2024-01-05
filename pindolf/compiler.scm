@@ -139,92 +139,48 @@
 (define (compiled-clause (pattern expression) index)
   (let loop ((binding '())
              (code '())
-             (subindex 0)
+             (current `(,index 0))
              (pending `((,pattern *VIEW*))))
-    (match pending
-      (()
-       `(,@code
-         ((,index ,subindex)
-          ,@(map (lambda ((s . v)) `(LET ,s ,v)) binding)
-          ,@(compiled-expression expression))))
 
-      ((('_ v) . pending*) (loop binding code subindex pending*))
+    (let* (((_ subidx) current)
+           (next     `(,index ,(1+ subidx)))
+           (fallback `(,(1+ index) 0)))
 
-      (((('quote e) v) . pending*)
-       (let* ((code* `(,@code
-                       ((,index ,subindex) (IF (EQ? ,v ',e)
-                                               (,index ,(1+ subindex))
-                                               ELSE (,(1+ index) 0)))))
-              (subindex* (1+ subindex)))
-         (loop binding code* subindex* pending*)))
+      (define (code-for cond)
+        `(,@code
+          (,current (IF ,cond ,next ELSE ,fallback))))
 
-      ((((? number? n) v) . pending*)
-       (let* ((code* `(,@code
-                       ((,index ,subindex) (IF (EQ? ,v ,n)
-                                               (,index ,(1+ subindex))
-                                               ELSE (,(1+ index) 0)))))
-              (subindex* (1+ subindex)))
-         (loop binding code* subindex* pending*)))
+      (match pending
+        (() `(,@code
+              (,current ,@(map (lambda ((s . v)) `(LET ,s ,v)) binding)
+                        ,@(compiled-expression expression))))
 
-      (((() v) . pending*)
-       (let* ((code* `(,@code
-                       ((,index ,subindex) (IF (NIL? ,v)
-                                               (,index ,(1+ subindex))
-                                               ELSE (,(1+ index) 0)))))
-              (subindex* (1+ subindex)))
-         (loop binding code* subindex* pending*)))
+        ((('_ v) . pending*) (loop binding code current pending*))
 
-      ;;; i must admit it's not a very friendly procedure
-      ;;; and this section is extremely unfriendly. TODO
-      (((((? vartype? t) (? symbol? s)) v) . pending*)
-       (match (lookup s #;in binding)
-         (#f (match t
-               ('num
-                (let* ((binding* `((,s . ,v) . ,binding))
-                       (code*
-                        `(,@code
-                          ((,index ,subindex) (IF (NUM? ,v)
-                                                  (,index ,(1+ subindex))
-                                                  ELSE (,(1+ index) 0)))))
-                    (subindex* (1+ subindex)))
-                  (loop binding* code* subindex* pending*)))
-               ('sym
-                (let* ((binding* `((,s . ,v) . ,binding))
-                       (code*
-                        `(,@code
-                          ((,index ,subindex) (IF (SYM? ,v)
-                                                  (,index ,(1+ subindex))
-                                                  ELSE (,(1+ index) 0)))))
-                       (subindex* (1+ subindex)))
-                  (loop binding* code* subindex* pending*)))
-               ('atm
-                (let* ((binding* `((,s . ,v) . ,binding))
-                       (code*
-                        `(,@code
-                          ((,index ,subindex) (IF (ATM? ,v)
-                                                  (,index ,(1+ subindex))
-                                                  ELSE (,(1+ index) 0)))))
-                       (subindex* (1+ subindex)))
-                  (loop binding* code* subindex* pending*)))
-               ('exp
-                (let* ((binding* `((,s . ,v) . ,binding)))
-                  (loop binding* code subindex pending*)))))
-         (v* (let* ((code*
-                     `(,@code
-                       ((,index ,subindex) (IF (EQ? ,v ,v*)
-                                               (,index ,(1+ subindex))
-                                               ELSE (,(1+ index) 0)))))
-                    (subindex* (1+ subindex)))
-               (loop binding code* subindex* pending*)))))
+        (((('quote e) v) . pending*)
+         (loop binding (code-for `(EQ? ,v ',e)) next pending*))
 
-      ((((p . ps) v) . pending*)
-       (let* ((pending** `((,p (CAR ,v)) (,ps (CDR ,v)) . ,pending*))
-              (code* `(,@code
-                       ((,index ,subindex) (IF (CONS? ,v)
-                                               (,index ,(1+ subindex))
-                                               ELSE (,(1+ index) 0)))))
-              (subindex* (1+ subindex)))
-         (loop binding code* subindex* pending**))))))
+        ((((? number? n) v) . pending*)
+         (loop binding (code-for `(EQ? ,v ,n)) next pending*))
+
+        (((() v) . pending*)
+         (loop binding (code-for `(NIL? ,v)) next pending*))
+
+        (((((? vartype? t) (? symbol? s)) v) . pending*)         
+         (match (lookup s #;in binding)           
+           (#f
+            (let ((binding* `((,s . ,v) . ,binding)))
+              (match t
+                ('num (loop binding* (code-for `(NUM? ,v)) next pending*))
+                ('sym (loop binding* (code-for `(SYM? ,v)) next pending*))
+                ('atm (loop binding* (code-for `(ATM? ,v)) next pending*))
+                ('exp (loop binding* code current pending*)))))
+           (v* (loop binding (code-for `(EQ? ,v ,v*)) next pending*))))
+        
+        ((((p . ps) v) . pending*)
+         (loop binding (code-for `(CONS? ,v)) next `((,p (CAR ,v))
+                                                     (,ps (CDR ,v))
+                                                     . ,pending*)))))))
 
 
 (e.g. (compiled-clause '(('APD () (exp ys)) ys) 1)

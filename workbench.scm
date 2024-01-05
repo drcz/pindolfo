@@ -5,117 +5,38 @@
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define pinp
   (with-input-from-file "pindolf-self-interpreter.sexp" read))
-
-(define lip (with-input-from-file "lisp0.sexp" read))
-(e.g. (pindolf '(example) lip) ===> 24)
-
-(define drc (with-input-from-file "DRC-machine.sexp" read))
-(e.g. (pindolf '(run-test) drc) ===> (q w e a s d))
-
-(define l2d (with-input-from-file "lisp2drc.sexp" read))
-(e.g. (pindolf '(compiled* car) l2d) ===> ((CAR)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define lisp-test
-  '((def ! (lambda (n)
-             (if (eq? n 0)
-                 1
-                 (* n (! (- n 1))))))
-    (def !s (lambda (ns)
-              (if (eq? ns ())
-                  ()
-                  (cons (! (car ns))
-                        (!s (cdr ns))))))
-    (def iot (lambda (n)
-               (if (eq? n 0)
-                   ()
-                   (cons n
-                         (iot (- n 1))))))
-    (!s (iot 6))))
+(define p1
+  '((('apd () ?ys) ys)
+    (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys))))))
 
-(e.g. (pindolf `(run ,lisp-test) lip)
-      ===> (720 120 24 6 2 1))
+(e.g. (pindolf '(apd (q w e) (1 2 3)) p1) ===> (q w e 1 2 3))
 
-(e.g. (run (compiled lip) `(run ,lisp-test))
-      ===> (720 120 24 6 2 1))
+(define c1 #;(compiled p1)
+  '(((0) (GOTO (0 0)))
+    ((0 0) (IF (CONS? *VIEW*) (0 1) ELSE (1 0)))
+    ((0 1) (IF (EQ? (CAR *VIEW*) 'apd) (0 2) ELSE (1 0)))
+    ((0 2) (IF (CONS? (CDR *VIEW*)) (0 3) ELSE (1 0)))
+    ((0 3) (IF (NIL? (CAR (CDR *VIEW*))) (0 4) ELSE (1 0)))
+    ((0 4) (IF (CONS? (CDR (CDR *VIEW*))) (0 5) ELSE (1 0)))
+    ((0 5) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (0 6) ELSE (1 0)))
+    ((0 6) (LET ys (CAR (CDR (CDR *VIEW*))))
+           (RETURN ys))
+    ((1 0) (IF (CONS? *VIEW*) (1 1) ELSE (2 0)))
+    ((1 1) (IF (EQ? (CAR *VIEW*) 'apd) (1 2) ELSE (2 0)))
+    ((1 2) (IF (CONS? (CDR *VIEW*)) (1 3) ELSE (2 0)))
+    ((1 3) (IF (CONS? (CAR (CDR *VIEW*))) (1 4) ELSE (2 0)))
+    ((1 4) (IF (CONS? (CDR (CDR *VIEW*))) (1 5) ELSE (2 0)))
+    ((1 5) (IF (NIL? (CDR (CDR (CDR *VIEW*)))) (1 6) ELSE (2 0)))
+    ((1 6) (LET ys (CAR (CDR (CDR *VIEW*))))
+           (LET xs (CDR (CAR (CDR *VIEW*))))
+           (LET x (CAR (CAR (CDR *VIEW*))))
+           (LET *VIEW* (CONS 'apd (CONS xs (CONS ys ()))))
+           (LET (V 0) (CALL (0) *VIEW*))
+           (RETURN (CONS x (V 0)))))
+)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(e.g.(pindolf `(compiled ,lisp-test) l2d)
-      ===> ((PROC ((NAME n)
-                   (CONST 0)
-                   (LOOKUP n)
-                   (EQ?)
-                   (SELECT ((CONST 1))
-                           ((CONST 1)
-                            (LOOKUP n)
-                            (MINUS)
-                            (LOOKUP !)
-                            (APPLY)
-                            (LOOKUP n)
-                            (TIMES)))
-                   (FORGET n)))
-            (NAME !)
-            (PROC ((NAME ns)
-                   (CONST ())
-                   (LOOKUP ns)
-                   (EQ?)
-                   (SELECT ((CONST ()))
-                           ((LOOKUP ns)
-                            (CDR)
-                            (LOOKUP !s)
-                            (APPLY)
-                            (LOOKUP ns)
-                            (CAR)
-                            (LOOKUP !)
-                            (APPLY)
-                            (CONS)))
-                   (FORGET ns)))
-            (NAME !s)
-            (PROC ((NAME n)
-                   (CONST 0)
-                   (LOOKUP n)
-                   (EQ?)
-                   (SELECT ((CONST ()))
-                           ((CONST 1)
-                            (LOOKUP n)
-                            (MINUS)
-                            (LOOKUP iot)
-                            (APPLY)
-                            (LOOKUP n)
-                            (CONS)))
-                   (FORGET n)))
-            (NAME iot)
-            (CONST 6)
-            (LOOKUP iot)
-            (APPLY)
-            (LOOKUP !s)
-            (APPLY)))
-
-(e.g. (equal? (pindolf `(compiled ,lisp-test) l2d)
-              (run (compiled l2d) `(compiled ,lisp-test))))
-
-(e.g. (pindolf `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ())
-               drc) ===> (720 120 24 6 2 1))
-
-(e.g. (run (compiled drc)
-           `(run-drc ,(pindolf `(compiled ,lisp-test) l2d) ()))
-      ===> (720 120 24 6 2 1))
-;;; sweet.
-
-
-(e.g. (equal?
-       (pindolf `(pindolf (compiled ,lisp-test) ,(parsed l2d))
-                pinp)
-       (run (compiled pinp)
-            `(pindolf (compiled ,lisp-test) ,(parsed l2d)))))
-;;; takes 15-20s...
-
-(e.g. (pindolf `(pindolf (run-drc ,(pindolf `(compiled ,lisp-test) l2d)
-                                  ())
-                         ,(parsed drc))
-               pinp) ===> (720 120 24 6 2 1))
-
+;;; driving time...
