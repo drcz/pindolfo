@@ -8,14 +8,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; even faster and dirtier pindolf->FCL* compiler
 
-(define (lookup sym #;in binding)
+(define (lookup key #;in binding)
   (match binding
     (() #f)
-    (((s . expr) . binding*) (if (equal? s sym) expr
-                              #;otherwise (lookup sym binding*)))))
+    (((k . expr) . binding*) (if (equal? k key) expr
+                              #;otherwise (lookup key binding*)))))
 
 (e.g. (lookup 'y '((x . 23) (y . 42) (z . (he he)))) ===> 42)
 (e.g. (lookup 'q '((x . 23) (y . 42) (z . ho!))) ===> #f)
+(e.g. (lookup '(1 3) '(((0 3) . 23) ((1 3) . 42) ((3 3) . ?))) ===> 42)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (applications-in expression)
@@ -231,8 +232,9 @@
      (let* ((boot `(((0) (GOTO (0 0))))) ;; you can insert stuff there!
             (compiled-clauses (map compiled-clause
                                    program*
-                                   (iota (length program)))))
-       (apply append `(,boot . ,compiled-clauses))))))
+                                   (iota (length program))))
+            (fallback `(((,(length program) 0) (RETURN 'no-match)))))
+       (apply append `(,boot ,@compiled-clauses ,fallback))))))
 
 (e.g. (compiled '( (('APD    ()      ?ys) ys)
                    (('APD (?x . ?xs) ?ys) `(,x . ,(& (APD ,xs ,ys))))
@@ -259,7 +261,10 @@
                     (LET x (CAR (CAR (CDR *VIEW*))))
                     (LET *VIEW* (CONS 'APD (CONS xs (CONS ys ()))))
                     (LET (V 0) (CALL (0) *VIEW*))
-                    (RETURN (CONS x (V 0)))) ))
+                    (RETURN (CONS x (V 0))))
+
+             ((2 0) (RETURN 'no-match))))
+
 ;;;; brilliaaaaaaaaaaaaaaaaant \o/
 
 (e.g. (compiled '((('MUL  0  _) 0)
@@ -296,4 +301,7 @@
                    (LET x (CAR (CDR *VIEW*)))
                    (LET *VIEW* (CONS 'MUL (CONS (- x 1) (CONS y ()))))
                    (LET (V 0) (CALL (0) *VIEW*))
-                   (RETURN (+ y (V 0))))))
+                   (RETURN (+ y (V 0))))
+
+            ((3 0) (RETURN 'no-match))))
+
