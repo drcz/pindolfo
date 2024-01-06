@@ -8,11 +8,6 @@
 ;;; now the fast and dirty (re-)implementation of FLC* variant
 ;;; (flowcharts with fun.calls similar to Glueck'2012 or sth)
 
-;;; we presume it always starts at (0) and the input is *VIEW*?
-;;; primops should be CONS,CAR,CDR,+,-,CONS?,NIL?,EQ? + consts (),T
-;;; aaand the calls should be limited to *VIEW*-modifying ones (4now?)
-
-
 (define (lookup sym #;in binding)
   (match binding
     (() #f)
@@ -76,13 +71,10 @@
 (e.g. (value '(SYM? x) '((x . yup))) ===> T)
 (e.g. (value '(SYM? x) '((x . (n o p e)))) ===> ())
 
-(e.g. (value '(+ (V 0) (V 1)) '(((V 0) . 2) ((V 1) . 3))) ===> 5)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (run program input)
   (let loop ((binding `((*VIEW* . ,input)))
-             (cur-block (lookup '(0) program)))
-    ;[pretty-print binding]
+             (cur-block (cdr (car program))
+                        #;(lookup '(0) program)))
     (match cur-block
       ((('LET v ('CALL pp v*)) . cur-block*)
        (let ((val (loop `((*VIEW* . ,(lookup v* binding)))
@@ -101,6 +93,9 @@
        (if (equal? (value e binding) '())
            (loop binding (lookup pp-f program))
            (loop binding (lookup pp-t program)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(e.g. (value '(+ (V 0) (V 1)) '(((V 0) . 2) ((V 1) . 3))) ===> 5)
 
 (e.g.
  (run '(((0) (GOTO (0 0)))
