@@ -253,7 +253,7 @@
       ((? symbol? sym) sym)
       ((? number? num) num)
       (('quote e) expr)
-      (('quasiquote qq) (reduced-qq qq))
+      (('quasiquote qq) `(,'quasiquote ,(reduced-qq qq)))
       (((? primop? p) e e*) `(,p ,(rdcd e) ,(rdcd e*)))
       (('& e) (or (lookup expr res-for-apps) ;;; !!!!!!
                   `(& ,(reduced-qq e))))
@@ -306,12 +306,18 @@
 (define (cps-step e kont)
   (match e
     (('& a) `(& (,@a ,kont)))
-    (e `(& (,kont (,'unquote ,e))))))
+    (('quote e) `(& ((,'unquote ,kont) ,e)))
+    (('quasiquote e) `(& ((,'unquote ,kont) ,e)))
+    (e `(& ((,'unquote ,kont) (,'unquote ,e))))))
 
 (e.g. (cps-step '(& (f ,x)) 'k)
       ===> (& (f ,x k)))
-(e.g. (cps-step '(+ (res 0) (res 2)) 'k)
-      ===> (& (k ,(+ (res 0) (res 2)))))
+(e.g. (cps-step '(+ res0 res2) 'k)
+      ===> (& (,k ,(+ res0 res2))))
+(e.g. (cps-step '`(boom ,res0 ,res2) 'k)
+      ===> (& (,k (boom ,res0 ,res2))))
+(e.g. (cps-step ''(hi there!) 'k)
+      ===> (& (,k (hi there!))))
 
 (define (cps-pattern p kont) ;;; ,,for now''...
   `(,@p (exp ,kont)))
@@ -338,7 +344,7 @@
     (let loop ((todo steps)
                (done '())
                (pat pattern*)
-               (keeping `(,@vars ,kont)))
+               (keeping `(,pattern ,@vars ,kont)))
       (match todo
         (() done)
         (((res kont step) . todo*)
@@ -362,8 +368,146 @@
       ((('KONT1 ?y ?x ?K ?res0) ?res1)
        #;--> (& (f ,res1 (KONT2 ,y ,x ,K ,res0 ,res1))))
       ((('KONT2 ?y ?x ?K ?res0 ?res1) ?res2)
-       #;--> (& (K ,(+ res0 res2)))) ))))
+       #;--> (& (,K ,(+ res0 res2)))) ))))
 
 ;;; wooooooooow
 
-        
+;;; so now something like idk, unique K names or sth?
+;;; in order to compile entire thing?
+;;; OR maybe we could use entire pattern?! like prepend it with KONTi
+;;; but then just paste it all, so it actually keeps all its vars
+;;; (trivially and DISREGARDING its form, which would remove the smell!)
+;;; and the rest would just fly??
+
+;;; so instead of
+'(('KONT1 ?y ?x ?K ?res0) ?res1)
+;;; we'd rather write
+'(('KONT1 ('h ?x ?y) ?K ?res0) ?res1)
+;;; and instead of passing
+'(KONT1 ,y ,x ,K ,res0)
+;;; we'd be passing
+'(KONT1 (h ,x ,y) ,K ,res0)
+;;; that seems like a REVOLUTIONARY idea.
+
+(define (pattern2passing p)
+  (match p
+    (((? vartype?) v) `(,'unquote ,v))
+    (('quote e) e)
+    ((p . p*) `(,(pattern2passing p) . ,(pattern2passing p*)))
+    (e e) #;should-not-happen?))
+
+(e.g. (pattern2passing '('h (exp x) (exp y)))
+      ===> (h ,x ,y))
+(e.g. (pattern2passing '('h (exp elo) ((num n) '+ (num m))))
+      ===> (h ,elo (,n + ,m)))
+
+(define (cps clause kont) ;; ensure its massaged (parsed)!
+  (let* (((pattern expression) clause)
+         (pattern* (cps-pattern pattern kont))
+         (pat-pass (pattern2passing pattern)) ;; better name...?
+         (steps (expression2steps expression))
+         (last-kont kont))
+    (let loop ((todo steps)
+               (done '())
+               (pat pattern*)
+               (keeping `(,kont)))
+      (match todo
+        (() done)
+        (((res kont step) . todo*)
+         (let* ((kont* (if (= 0 (length todo*))
+                           last-kont
+                           `(,kont ,pat-pass ,@(vars2exp keeping))))
+                (step* (cps-step step kont*))
+                (pat* `((',kont ,pattern ,@(vars2pat keeping))
+                        (exp ,res)))
+                (keeping* `(,@keeping ,res))
+                (done* `(,@done (,pat ,step*))))
+           (loop todo* done* pat* keeping*)))))))
+
+
+(e.g.
+ (equal?
+  (cps '(('h (exp x) (exp y)) (+ (& (f ,x)) (& (f ,(& (g ,y)))))) 'K)
+  (parsed
+   '( (('h ?x ?y ?K)
+       #;--> (& (f ,x (KONT0 (h ,x ,y) ,K))))
+      ((('KONT0 ('h ?x ?y) ?K) ?res0)
+       #;--> (& (g ,y (KONT1 (h ,x ,y) ,K ,res0))))
+      ((('KONT1 ('h ?x ?y) ?K ?res0) ?res1)
+       #;--> (& (f ,res1 (KONT2 (h ,x ,y) ,K ,res0 ,res1))))
+      ((('KONT2 ('h ?x ?y) ?K ?res0 ?res1) ?res2)
+       #;--> (& (,K ,(+ res0 res2)))) ))))
+
+;;; so now we could... try it?!
+
+(define (cpsized program)
+  (let* ((last-clause '(('_id_ (exp x)) x)) ;; TODO check for uniqueness?
+         (outermost-kont 'K))
+    (apply append
+           `(,@(map (lambda (c) (cps c outermost-kont)) (parsed program))
+             (,last-clause)))))
+
+(e.g.
+ (equal?
+  (cpsized
+   '( (('apd () ?ys) ys)
+      (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys)))) ))
+  (parsed
+   '( (('apd () ?ys ?K)
+       #;--> (& (,K ,ys)))
+      (('apd (?x . ?xs) ?ys ?K)
+       #;--> (& (apd ,xs ,ys (KONT0 (apd (,x . ,xs) ,ys) ,K))))
+      ((('KONT0 ('apd (?x . ?xs) ?ys) ?K) ?res0)
+       #;--> (& (,K (,x . ,res0))))
+      (('_id_ ?x) x) ))))
+
+(e.g. 
+ (pindolf '(apd (q w e) (a s d))
+          '( (('apd () ?ys) ys)
+             (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys)))) ))
+ ===> (q w e a s d))
+
+(e.g. 
+ (pindolf '(apd (q w e) (a s d) _id_)
+          (cpsized 
+           '( (('apd () ?ys) ys)
+              (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys)))) )))
+ ===> (q w e a s d))
+
+;;;;;;; WIWAT!
+
+
+(define larger-example
+  '(
+    (('fold-r ?op ?e    ()     ) e)
+    (('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+
+    (('cons ?h ?t) `(,h . ,t))
+    (('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
+
+    ((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
+    (('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
+
+    (('dup ?x) `(,x . ,x))
+    (('dbl %n) (+ n n))
+
+    (('rev ?xs) (& (rev ,xs ())))
+    (('rev    ()      ?rs) rs)
+    (('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
+   ))
+
+(define large-cps (cpsized larger-example))
+
+(e.g. (pindolf '(apd (q w e) (a s d) _id_) large-cps)
+      ===> (q w e a s d))
+
+(e.g. (pindolf '(map dbl (1 2 3) _id_) large-cps)
+      ===> (2 4 6))
+
+(e.g. (pindolf '(map dup (- 0 ^) _id_) large-cps)
+      ===> ((- . -) (0 . 0) (^ . ^)))
+
+(e.g. (pindolf '(rev (dercz likes CPS) _id_) large-cps)
+      ===> (CPS likes dercz))
+
+;;;;; absolutna euforia
