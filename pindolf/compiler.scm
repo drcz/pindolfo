@@ -119,8 +119,16 @@
                vars4apps))
          (ret-code
           `((RETURN ,(compiled-subexpression expression
-                                             vars4apps)))))
-    (fold-right append ret-code apps-code)))
+                                             vars4apps))))
+         (compilate (fold-right append ret-code apps-code)))
+    (match compilate 
+      ((code ...
+          ('LET v ('CALL lbl '*VIEW*))
+          ('RETURN v)) ;;; a tail-call! optimize! o/
+       `(,@code (GOTO ,lbl)))
+      (_ compilate))))
+
+          
 
 (e.g. (compiled-expression '(+ (& (VAL ,a)) (& (VAL ,b))))
       ===> ( (LET *VIEW* (CONS 'VAL (CONS a ())))
@@ -133,6 +141,11 @@
       ===> ( (LET *VIEW* (CONS 'APD (CONS xs (CONS ys ()))))
              (LET (V 0) (CALL (0) *VIEW*))
              (RETURN (CONS x (V 0))) ))
+
+;;; tail-call optimization ftw!
+(e.g. (compiled-expression '(& (tail-call ,xs)))
+      ===> ((LET *VIEW* (CONS 'tail-call (CONS xs ())))
+            (GOTO (0)))) ;;; \o/
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (vartype? x) (member? x '(num sym atm exp)))
