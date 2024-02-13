@@ -1,13 +1,13 @@
-;;; some attempt at CPS-conversion
+;;; some metapindolf[o] stuff, i guess...
+(define-module (pindolf transformations)
+  #:use-module (grand scheme)
+  #:use-module (pindolf parser)
+  #:use-module (pindolf interpreter) ;; 4testing
+  #:export (cpsized))
 
-(use-modules (grand scheme))
-(add-to-load-path "./")
-(define parsed (@ (pindolf parser) parsed))
-(define pindolf (@ (pindolf interpreter) pindolf))
-;;; the rest of stuff differs from compiler/parser versions a bit
+(define (member? x xs) (and (member x xs) #t)) ;; :)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define member? member) ;; he_he
 
 (define (lookup key #;in binding)
   (match binding
@@ -18,7 +18,6 @@
 (e.g. (lookup 'x '((x . y) ((complex key) . 23))) ===> y)
 (e.g. (lookup '(complex key) '((x . y) ((complex key) . 23))) ===> 23)
 
-
 ;;; let's make it pretty since otherwise it can blow the interpreter
 (define (mk-label (l id))
   (string->symbol (string-append (symbol->string l)
@@ -27,6 +26,105 @@
 (e.g. (mk-label '(res 0)) ===> res0)
 (e.g. (mk-label '(KONT 5)) ===> KONT5)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; CPS-like transformation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+"
+Pindolf (and its VM too) uses call stack, so that one can have
+nested ,,applications'' (that is (& ...) forms) within each rhs
+of clause (usually called expression throughout this repo).
+like this: (+ (& (f ,x)) (& (g ,y))).
+in functional language (i.e. one where there exist such thing as
+a function/procedure) such &-forms are called ``applications''
+and although pindolf is more low-level than that, we can emulate
+functions/procedures with &-forms and patterns, e.g. scheme
+procedure:
+  (define (f x) (* x x))
+
+and its application:
+  (f (+ 2 3))
+
+could be expressed with a clause:
+  (('f %x) (* x x))
+
+and an expression:
+  (& (f ,(+ 2 3)))
+
+of course that's just one use of pindolf but that is offtopic.
+now in the world of FP any expression can be converted into
+continuation-passing style (CPS for short, and its opposite is
+usually called ``direct style'') -- form in which the order of
+evaluation gets fixed and each application is in tail-position.
+the latter allows e.g. nice and smooth compilation into
+imperative program and stuff.
+
+the trick for CPS-conversion (of possibly direct-style program)
+is to add to each procedure in the program an extra argument
+called ``continuation'' (mostly because it is continuation, duh)
+which is basically a call stack turned into closure.
+
+to be more concrete, for scheme program:
+  (define (f x) (* x x))
+  (define (h x y) (+ (f x) (f y)))
+  (h 2 3)
+
+its CPS-version could be something like:
+  (define (f x k) (k (* x x)))
+  (define (h x y k)
+    (f x (lambda (res)
+           (f y (lambda (res*)
+                  (k (+ res res*)))))))
+  (define (id x) x)
+  (h 2 3 id)
+
+you can find out more in the literature, especially [1].
+
+but how would one do such thing in pindolf? well, there are
+no procedures as such, and even worse there are no closures.
+however we can emulate all these things by making them explicit
+which is all this language is about.
+translating the above direct-style scheme into pindolf we'd
+have:
+  ( (('f %x) (* x x))
+    (('h %x %y) (+ (& (f ,x)) (& (f ,y))))
+    (('run) (& (h 2 3))) )
+
+which in CPS-like form could look like this:
+  ( (('f %x ?k) (& (,k ,(* x x))))
+    (('h %x %y ?k) (& (f ,x (hK ,y ,k))))
+    ((('hK %y ?k) %res) (& (f ,y (hK* ,res ,k))))
+    ((('hK* %res ?k) %res*) (& (,k ,res ,res*)))
+    (('id ?x) x)
+    (('run) (& (h 2 3 id))) )
+
+it should take no more than 5 years to grasp this idea
+and it gets easier when one realizes that when mimicking
+higher-order functions/procedures in pindolf we basically
+defunctonalize them (defunctionalization is a process of
+replacing closures with datastructures enclosing all the
+relevant part of environment, plus an identifier of the
+function at hand -- again, there's whole lot of literature
+on that, with most likely best paper being [2]).
+so all one has to do is to mentally CPSize and then
+defunctionalize et voila, you get pindolfish FP style.
+
+the following transformation does basically that, though
+in a rather crude but beautifully simple way.
+the only thing which so far sucks is that it doesn't check
+if the extra clause (('_id_ ?x) x) doesn't collide
+pattern-wise with something already in the code, but you
+don't really have to use it if you happen to have your own
+-- the only point is to have trivial final continuation;
+perhaps calling it 'return instead of _id_ would be less
+nerdy but whatever.
+
+enjoy!
+
+--------------------------------------------------------------
+[1] Danvy ``Three Steps for the CPS Transformation'' (1992)
+[2] Danvy, Nielsen ``Defunctionalization at work'' (2001)
+"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (primop? x) (member? x '(+ - *)))
@@ -283,61 +381,5 @@
               (('apd (?x . ?xs) ?ys) `(,x . ,(& (apd ,xs ,ys)))) )))
  ===> (q w e a s d))
 
-
+;;; for more examples cf ../tests.scm
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define larger-example
-  '(
-    (('fold-r ?op ?e    ()     ) e)
-    (('fold-r ?op ?e (?x . ?xs)) (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
-
-    (('cons ?h ?t) `(,h . ,t))
-    (('apd ?xs ?ys) (& (fold-r cons ,ys ,xs)))
-
-    ((('cons*f.hd ?f) ?h ?t) (& (cons ,(& (,f ,h)) ,t)))
-    (('map ?f ?xs) (& (fold-r (cons*f.hd ,f) () ,xs)))
-
-    (('dup ?x) `(,x . ,x))
-    (('dbl %n) (+ n n))
-
-    (('rev ?xs) (& (rev ,xs ())))
-    (('rev    ()      ?rs) rs)
-    (('rev (?x . ?xs) ?rs) (& (rev ,xs (,x . ,rs))))
-   ))
-
-(define large-cps (cpsized larger-example))
-
-(e.g. (pindolf '(apd (q w e) (a s d) _id_) large-cps)
-      ===> (q w e a s d))
-
-(e.g. (pindolf '(map dbl (1 2 3) _id_) large-cps)
-      ===> (2 4 6))
-
-(e.g. (pindolf '(map dup (- 0 ^) _id_) large-cps)
-      ===> ((- . -) (0 . 0) (^ . ^)))
-
-(e.g. (pindolf '(rev (dercz likes CPS) _id_) large-cps)
-      ===> (CPS likes dercz))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; even more hardcore test, one level deeper:
-
-(define pinp ;; pindolf-in-pindolf...
-  (with-input-from-file "pindolf-self-interpreter.sexp" read))
-(define cps-pinp (cpsized pinp)) ;; ...in CPS form...
-(define src (parsed larger-example)) ;; ...with some stuff to do
-
-(e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,src _id_) cps-pinp)
-      ===> (q w e a s d))
-
-(e.g. (pindolf `(pindolf (map dbl (1 2 3)) ,src _id_) cps-pinp)
-      ===> (2 4 6))
-
-(e.g. (pindolf `(pindolf (map dup (- 0 ^)) ,src _id_) cps-pinp)
-      ===> ((- . -) (0 . 0) (^ . ^)))
-
-(e.g. (pindolf `(pindolf (rev (dercz likes CPS)) ,src _id_) cps-pinp)
-      ===> (CPS likes dercz))
-
-;;; that is truly amazing, time to go to bed tho.

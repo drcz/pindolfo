@@ -1,7 +1,8 @@
 (use-modules (grand scheme))
 (add-to-load-path "./")
-(define pindolf (@ (pindolf interpreter) pindolf))
 (define parsed (@ (pindolf parser) parsed))
+(define pindolf (@ (pindolf interpreter) pindolf))
+(define cpsized (@ (pindolf transformations) cpsized))
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
 
@@ -560,6 +561,55 @@
 
 (write `(tests for lisp->DRC and its execution, in pinp (!!) and compiled pinp (!!!) passed))
 (newline)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(pretty-print `(testing cps-like transformation!))
+
+(define p3-cps (cpsized p3)) ;; parsed?!
+
+(e.g. (pindolf '(apd (q w e) (a s d) _id_) p3-cps)
+      ===> (q w e a s d))
+
+(e.g. (pindolf '(map dbl (1 2 3) _id_) p3-cps)
+      ===> (2 4 6))
+
+(e.g. (pindolf '(map dup (- 0 ^) _id_) p3-cps)
+      ===> ((- . -) (0 . 0) (^ . ^)))
+
+(e.g. (pindolf '(rev (dercz likes CPS) _id_) p3-cps)
+      ===> (CPS likes dercz))
+
+(define cmp-p3-cps (compiled p3-cps))
+
+(e.g. (run cmp-p3-cps '(apd (q w e) (a s d) _id_))
+      ===> (q w e a s d))
+(e.g. (run cmp-p3-cps '(map dbl (1 2 3) _id_))
+      ===> (2 4 6))
+(e.g. (run cmp-p3-cps '(map dup (- 0 ^) _id_))
+      ===> ((- . -) (0 . 0) (^ . ^)))
+(e.g. (run cmp-p3-cps '(rev (dercz likes cps) _id_))
+      ===> (cps likes dercz))
+
+(pretty-print `(tests for cpsized p3 passed))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define cps-pinp (cpsized pinp)) ;; PINP in CPS form!
+(define src p3) 
+
+(e.g. (pindolf `(pindolf (apd (q w e) (a s d)) ,src _id_) cps-pinp)
+      ===> (q w e a s d))
+
+(e.g. (pindolf `(pindolf (map dbl (1 2 3)) ,src _id_) cps-pinp)
+      ===> (2 4 6))
+
+(e.g. (pindolf `(pindolf (map dup (- 0 ^)) ,src _id_) cps-pinp)
+      ===> ((- . -) (0 . 0) (^ . ^)))
+
+(e.g. (pindolf `(pindolf (rev (dercz likes CPS)) ,src _id_) cps-pinp)
+      ===> (CPS likes dercz))
+
+(pretty-print `(tests for cpsized pinp running p3 passed!))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (newline) (display '\o/) (newline)
