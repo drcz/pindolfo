@@ -125,7 +125,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; now for some real hardcode, DRC machine...
 
-(define drc (with-input-from-file "DRC-machine.sexp" read))
+(define drc
+  (with-input-from-file "examples/DRC-machine.pndlf" read))
 
 (e.g. (pindolf '(run-test) drc) ===> (q w e a s d))
 (e.g. (pindolf '(run-test2 (it does) (work indeed)) drc)
@@ -229,7 +230,8 @@
 ;;; and just a little more hardcode: pindolf in pindolf
 
 (define pinp ;; all of the sudden: PINDOLF in PINDOLF!!!
-  (with-input-from-file "pindolf-self-interpreter.sexp" read))
+  (with-input-from-file
+      "examples/pindolf-self-interpreter.pndlf" read))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; look!
@@ -317,7 +319,8 @@
 (pretty-print `(tests for pinp (pindolf in pindolf) passed))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define lip (with-input-from-file "lisp0.sexp" read))
+(define lip (with-input-from-file "examples/lisp0.pndlf" read))
+
 (e.g. (pindolf '(example) lip) ===> 24)
 
 (e.g. (pindolf '(run ((def ! (lambda (n) (if (eq? n 0) 1 (* n (! (- n 1))))))
@@ -448,7 +451,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define l2d (with-input-from-file "lisp2drc.sexp" read))
+(define l2d (with-input-from-file "examples/lisp2DRC.pndlf" read))
 (e.g. (pindolf '(compiled* car) l2d) ===> ((CAR)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -611,5 +614,51 @@
 
 (pretty-print `(tests for cpsized pinp running p3 passed!))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; stupidly long computations
+
+(define peano
+  (parsed 
+   (with-input-from-file "examples/peano.pndlf" read)))
+
+(e.g. (pindolf '(test1) peano) ===> yes)
+
+(e.g. (pindolf '((S S S Z) + (S S Z)) peano) ===> (S S S S S Z))
+(e.g. (pindolf '((S S S Z) * (S S Z)) peano) ===> (S S S S S S Z))
+(e.g. (pindolf '(! (Z)) peano) ===> (S Z))
+(e.g. (pindolf '(! (S S S Z)) peano) ===> (S S S S S S Z))
+
+(e.g. (pindolf '((S S Z) <= (S S S Z)) peano) ===> yes)
+(e.g. (pindolf '((S S Z) <= (S S Z)) peano) ===> yes)
+(e.g. (pindolf '((S S Z) <= (S Z)) peano) ===> no)
+
+(e.g. (pindolf '((does (S S S S Z) = (S S Z) *) (S S Z))
+               peano) ===> yes)
+(e.g. (pindolf '((does (S S S S Z) = (S S S Z) *) (S Z))
+               peano) ===> no)
+(e.g. (pindolf '((S S Z) divides (S S S S Z)) peano) ===> yes)
+(e.g. (pindolf '((S S Z) divides (S S S S S Z)) peano) ===> no)
+(e.g. (pindolf '((is (S S S S Z) divisible by) (S S Z))
+               peano) ===> yes)
+
+(e.g. (pindolf '(not yes) peano) ===> no)
+(e.g. (pindolf '(not no) peano) ===> yes)
+
+(e.g. (pindolf '(pr* yes (S S S Z) (is (S S S Z) divisible by)) peano)
+      ===> yes)
+
+(e.g. (pindolf '(test2) peano) ===> yes)
+(e.g. (pindolf '(test3) peano) ===> yes)
+(e.g. (pindolf '(test4) peano) ===> no)
+
+
+(e.g. (pindolf `(pindolf (test1) ,peano) pinp) ===> yes)
+(e.g. (pindolf `(pindolf (test2) ,peano) pinp) ===> yes)
+(e.g. (pindolf `(pindolf (test3) ,peano) pinp) ===> yes)
+;;; super slooow
+(e.g. (pindolf `(pindolf (test4) ,peano) pinp) ===> no)
+
+
+(pretty-print `(tests for stupidly long computations passed!))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (newline) (display '\o/) (newline)

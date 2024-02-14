@@ -1,0 +1,55 @@
+(
+; ------------------------------------------------------------
+; -- Guiseppe and drcz make computations tricky \o/
+
+((('Z) '= ('Z)) 'yes)
+((('S . ?n) '= ('S . ?m)) (& (,n = ,m)))
+((_ '= _) 'no)
+
+((('Z) '+ ?m) m)
+((('S . ?n) '+ ?m) `(S . ,(& (,n + ,m))))
+
+((('Z) '* ?m) '(Z))
+((('S . ?n) '* ?m) (& (,m + ,(& (,n * ,m)))))
+
+(('! ('Z)) '(S Z))
+(('! ('S . ?n)) (& ((S . ,n) * ,(& (! ,n)))))
+
+((('Z) '<= _) 'yes)
+((_ '<= ('Z)) 'no)
+((('S . ?n) '<= ('S . ?m)) (& (,n <= ,m)))
+
+(('E< ('Z) ?π) 'no)
+(('E< ('S . ?n) ?π) (& (E<* ,(& (,π ,n)) ,n ,π)))
+(('E<* 'yes _ _) 'yes)
+(('E<* 'no ?n ?π) (& (E< ,n ,π)))
+
+((('does ?n '= ?m '*) ?x) (& (,(& (,m * ,x)) = ,n)))
+
+((?m 'divides ?n) (& (div* ,(& (,m <= ,n))
+                           ,n
+                           (does ,n = ,m *))))
+(('div* 'yes ?n ?π) (& (E< ,n ,π)))
+(('div* 'no _ _) 'no)
+
+((('is ?n 'divisible 'by) ?x) (& (,x divides ,n)))
+
+((?n 'is 'prime) (& (pr* ,(& ((S S Z) <= ,n))
+                         ,n
+                         (is ,n divisible by))))
+(('pr* 'no _ _) 'no)
+(('pr* 'yes ?n ?π) (& (not ,(& (E< ,n ,π)))))
+
+(('not 'yes) 'no)
+(('not 'no) 'yes)
+
+;;; Principia Mathematica, Volume II (1st edition) prop. 110.643 [page 86]
+(('test1) (& (,(& ((S Z) + (S Z))) = (S S Z))))
+;;; lucky number
+(('test2) (& ((S S S S S S S S S S S S S Z) is prime)))
+;;; n!+1 are sometimes prime...
+(('test3) (& (,(& ((S Z) + ,(& (! (S S S Z))))) is prime)))
+;;; ...but not always
+(('test4) (& (,(& ((S Z) + ,(& (! (S S S S Z))))) is prime)))
+
+)

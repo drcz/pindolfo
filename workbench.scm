@@ -6,7 +6,8 @@
 (define run (@ (pindolf vm) run))
 
 (define pinp
-  (with-input-from-file "pindolf-self-interpreter.sexp" read))
+  (with-input-from-file
+      "examples/pindolf-self-interpreter.pndlf" read))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; first steps towards some kind of driving...
@@ -117,7 +118,24 @@
             (2 (RETURN 23))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; replace weird labels with natural numbers
+;;; 3. duplicated (behaviorally identical) blocks should go, no?
+
+;;; (a) we might not want to do this (at most after driving),
+;;; (b) but if we did i only had two ideas, the greedy one (prolly
+;;; not suitable) of grouping all the identically-shaped blocks and
+;;; picking lowest label L for them, then replacing all references
+;;; (GOTOs and CALLs) to any from the group with L, and then
+;;; repeating the process until there are no more replacements
+;;; (ie each grouping has only one member)...
+;;; ...and the weird one with identifying each leaf with the
+;;; conditions of reaching it but that'll go into separate file
+;;; for now since it's a pretty bloated idea.
+
+;;; there's no need to worry since it seems we won't need that
+;;; (obvious _) thing soon.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; 4. replace weird labels with natural numbers
 (define (simplified-labels code)
   (let ((lbl-map (map (lambda (c i) (cons (car c) i))
                       code (iota (length code)))))
