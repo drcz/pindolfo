@@ -2,8 +2,11 @@
 (add-to-load-path "./")
 (define pindolf (@ (pindolf interpreter) pindolf))
 (define parsed (@ (pindolf parser) parsed))
+(define cpsized (@ (pindolf transformations) cpsized))
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
+
+(define ((equals? x) y) (equal? x y)) ;; handy in patterns...
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (lookup key #;in binding)
@@ -32,9 +35,8 @@
                (('APD (?x . ?xs) ?ys) `(,x . ,(& (APD ,xs ,ys))))
                )))
 
-(define test-p3
-  (compiled
-   '(
+(define p3
+  '(
      (('fold-r (exp op) (exp e) ()) e)
      (('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
       (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
@@ -51,19 +53,42 @@
      (('rev (exp xs)) (& (rev ,xs ())))
      (('rev () (exp rs)) rs)
      (('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
-     )))
+     ))
+
+(define test-p3 (compiled p3))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; first steps towards some kind of driving, for redundant tests
 ;;; removal to save some calls to <value> etc.
 
+;;; 0. some helpful stuff
+(define (all-tests code)
+  (apply union
+         (map (lambda (block)
+                (match block 
+                  ((lbl . (('IF t _ 'ELSE _))) `(,t))
+                  (_ '())))
+              code)))
+
+(e.g. (all-tests test123)
+      ===> ((CONS? (CAR (CDR *VIEW*)))
+            (NIL? (CDR (CDR (CDR *VIEW*))))
+            (CONS? (CDR (CDR *VIEW*)))
+            (NIL? (CAR (CDR *VIEW*)))
+            (CONS? (CDR *VIEW*))
+            (EQ? (CAR *VIEW*) 'APD)
+            (CONS? *VIEW*)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 1. analysis of decission tree:
 
 (define (successors label code) ;;; ONLY for IF nodes!
   (match (lookup label code)
     ((('IF _ l 'ELSE l*)) `(,l ,l*))
-    ((('GOTO l)) `(,l)) ;; again, just for bootstrap block?
+    ;((('GOTO l)) `(,l)) ;; again, just for bootstrap block?
+    ((('GOTO _)) '()) ;; waat?
     (_ '())))
 
 (e.g. (successors '(0 5) test123) ===> ((0 6) (1 0)))
@@ -72,6 +97,9 @@
 ;;; alive i.e. worth remembering (is there any chance the
 ;;; result of this test will be needed on any path from given
 ;;; block). it's a bit like LVA, only simpler.
+;;; nb the ordering is crucial to normalize the form of ppoints
+;;; since we don't want different ordering of the same tests
+;;; to result in a different ppoint -- cf (ppoint _ _ _ _) below.
 
 (define (live-tests code)
   (let* ((init-tests (map (lambda (block)
@@ -79,6 +107,7 @@
                               ((lbl . (('IF t _ 'ELSE _))) `(,lbl . (,t)))
                               ((lbl . _) `(,lbl . ()))))
                           code))
+         (all-tests (all-tests code)) ;; for ordering!
          (all-labels (map car code)))
     (let loop ((pend all-labels)
                (changes? #f)
@@ -92,7 +121,8 @@
                  (inherited-tests (apply append
                                          (map (lambda (l) (lookup l tests))
                                               (successors lbl code))))
-                 (my-tests* (union my-tests inherited-tests))
+                 (my-tests* (intersection all-tests ;;; ordering!
+                                          (union my-tests inherited-tests)))
                  (changes?* (or changes?
                                 (> (length my-tests*) (length my-tests))))
                  (tests* (if changes?*
@@ -106,13 +136,13 @@
 
 (define (ppoint lbl passed failed LVA)
   (let* ((live (lookup lbl LVA))
-         (passed* (intersection passed live))
-         (failed* (intersection failed live)))
+         (passed* (intersection live passed)) ;; see? ordering, since intersection
+         (failed* (intersection live failed))) ;; preserves order from left operand
     `(,lbl ,passed* ,failed*)))
 
 (e.g. (ppoint '(2 3)
               '(test1 test3)
-              '(test2 test4)
+              '(test4 test2) ;; again, nb corrected ordering in the result
               '(((2 3) . (test2 test3 test4))))
       ===> ((2 3) (test3) (test2 test4)))
 
@@ -148,38 +178,318 @@
 ;; perhaps this should be massaged-expression and happen on RETURNs too, though
 ;; as of now (CALL (0) *VIEW*) can only occur inside LET anyway...
 
-;;; now THIS is the core of our poor man's driving:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; 2. we're almost ready, just A LITTLE BIT OF LOGIC y'know...
+;;; you've already seen what a test is, the expression after 'IF.
+;;; an address is the part of test naming some part of *VIEW*, like
+;;; *VIEW* or (CAR (CDR *VIEW*)).
 
-(define (new-block pp code LVA) ;; assert (equal? LVA (live-tests code)) y'know
+(define (address? x)
+  (match x
+    ('*VIEW* #t)
+    (('CAR e) (address? e))
+    (('CDR e) (address? e))
+    (_ #f)))
+
+(e.g. (address? '*VIEW*))
+(e.g. (address? '(CAR *VIEW*)))
+(e.g. (address? '(CAR (CDR (CAR *VIEW*)))))
+(e.g. (not (address? ''apd)))
+
+;;; first of all, sometimes we expect two addresses a0 and a1 to contain
+;;; the same value (expression) -- with the test (EQ? <a0> <a1>). so all
+;;; the tests concerning a0 should also be true about a1!
+;;; any such pair of addresses we'll call aliases of each other.
+
+(define (address-aliases addr tests)
+  (define (all-aliases-for a #;in ts)
+    (match ts
+      (() '())
+      ((('EQ? (? (equals? a)) (? address? a*)) . ts*)
+       `(,a* . ,(all-aliases-for a ts*)))
+     ((('EQ? (? address? a*) (? (equals? a))) . ts*)
+      `(,a* . ,(all-aliases-for a ts*)))
+     ((_ .  ts*)
+      (all-aliases-for a ts*))))  
+  (let greedy ((aliases `(,addr))
+               (new-aliases (all-aliases-for addr #;in tests)))
+    (let* ((newer-aliases (apply union (map (lambda (a) (all-aliases-for a tests))
+                                            new-aliases)))
+           (aliases* (union aliases new-aliases))
+           (truly-newer-aliases (difference newer-aliases aliases*)))
+      (if (> (length truly-newer-aliases) 0)
+          (greedy aliases* truly-newer-aliases)
+          aliases*))))
+
+(e.g. (address-aliases '(CAR *VIEW*) '((EQ? (CAR *VIEW*) (CDR *VIEW*))))
+      ===> ((CDR *VIEW*) (CAR *VIEW*)))
+(e.g. (address-aliases '(CAR *VIEW*)
+                       '((EQ? (CAR *VIEW*) (CAR (CDR *VIEW*)))
+                         (EQ? (CAR (CDR (CDR *VIEW*))) (CAR (CDR *VIEW*)))))
+      ===> ((CAR (CDR (CDR *VIEW*)))
+            (CAR (CDR *VIEW*))
+            (CAR *VIEW*)))
+
+;;; ok, now we need all the tests concerning whichever of these addresses:
+(define (all-tests-concerning-one address tests)
+  (filter (lambda (t) (match t
+                   (('NIL? (? (equals? address))) #t)
+                   (('ATM? (? (equals? address))) #t)
+                   (('SYM? (? (equals? address))) #t)
+                   (('NUM? (? (equals? address))) #t)
+                   (('EQ? (? (equals? address)) _) #t)
+                   (('EQ? _ (? (equals? address))) #t)
+                   (('CONS? (? (equals? address))) #t)
+                   (_ #f)))
+          tests))
+
+(define (all-tests-concerning addresses tests)
+  (apply union (map (lambda (a) (all-tests-concerning-one a tests)) addresses)))
+
+(e.g. (all-tests-concerning-one '(CAR (CDR *VIEW*)) (all-tests test123))
+      ===> ((CONS? (CAR (CDR *VIEW*)))
+            (NIL? (CAR (CDR *VIEW*)))))
+(e.g. (all-tests-concerning-one '(CAR *VIEW*) (all-tests test123))
+      ===> ((EQ? (CAR *VIEW*) 'APD)))
+
+(e.g. (all-tests-concerning '((CAR *VIEW*)
+                              (CAR (CDR *VIEW*))) (all-tests test123))
+      ===> ((NIL? (CAR (CDR *VIEW*)))
+            (CONS? (CAR (CDR *VIEW*)))
+            (EQ? (CAR *VIEW*) 'APD)))
+
+;;; once this is done we no longer care about address, just the tests;
+;;; we turn these tests into abstract descriptions of s-expressions,
+;;; which can take one the following forms:
+(define (valid-description? d)
+  (match d
+    (('CONS?) #t)
+    (('NIL?) #t)
+    (('ATM?) #t)
+    (('SYM?) #t)
+    (('NUM?) #t)
+    (('EQ? (? number?)) #t)
+    (('EQ? (? symbol?)) #t) ;; nb no quote.
+    (('not (? valid-description?)) #t)
+    (_ #f)))
+
+;;; always useful (or not?):
+(define (normalized d)
+  (match d
+    (('not ('not d*)) (normalized d*))
+    (_ d)))
+
+;;; so let's construct these descriptions:
+(define (description<-test t)
+  (match t
+    (('CONS? _) '(CONS?))
+    (('NIL? _) '(NIL?))
+    (('ATM? _) '(ATM?))
+    (('NUM? _) '(NUM?))
+    (('SYM? _) '(SYM?))
+    (('EQ? (? address?) (? number? n)) `(EQ? ,n))
+    (('EQ? (? number? n) (? address?)) `(EQ? ,n))
+    ;;; quoted numbers would be too much, no?
+    (('EQ? (? address?) ('quote (? symbol? s))) `(EQ? ,s))
+    (('EQ? ('quote (? symbol? s)) (? address?)) `(EQ? ,s))
+    (_ #f)))
+
+(define (descriptions<-tests ts)
+  (filter-map description<-test ts))
+
+(e.g. (descriptions<-tests '((EQ? (CAR *VIEW*) 23)
+                             (EQ? (CDR *VIEW*) 'something)
+                             (CONS? *VIEW*)
+                             (EQ? (CAR *VIEW*) (CDR *VIEW*))))
+      ===> ((EQ? 23) (EQ? something) (CONS?)))
+
+;;; the point is to use them for only the tests concerning selected
+;;; address and its aliases (if any).
+(e.g. (descriptions<-tests
+       (all-tests-concerning '((CAR *VIEW*)
+                               (CAR (CDR *VIEW*))) (all-tests test123)))
+      ===> ((NIL?) (CONS?) (EQ? APD)))
+
+;;; it's not hard (only maybe a bit tedious) to figure out when two descriptions
+;;; can't be simultainously satisfied:
+(define ((contradicts? d0) d1)
+  (match `(,d0 ,d1)
+    ((d* ('not d*)) #t)
+    ((('not d*) d*) #t)
+    ((('CONS?) ('NIL?)) #t)
+    ((('CONS?) ('ATM?)) #t)
+    ((('CONS?) ('SYM?)) #t)
+    ((('CONS?) ('NUM?)) #t)
+    ((('CONS?) ('EQ? _)) #t)
+    ((('NIL?) ('CONS?)) #t)
+    ((('NIL?) ('SYM?)) #t)
+    ((('NIL?) ('NUM?)) #t)
+    ((('NIL?) ('EQ? ())) #f) ;; !
+    ((('NIL?) ('EQ? _)) #t)
+    ((('ATM?) ('CONS?)) #t)
+    ((('SYM?) ('CONS?)) #t)
+    ((('SYM?) ('NIL?)) #t)
+    ((('SYM?) ('NUM?)) #t)
+    ((('SYM?) ('EQ? (? number?))) #t)
+    ((('SYM?) ('EQ? ())) #t)
+    ((('NUM?) ('CONS?)) #t)
+    ((('NUM?) ('NIL?)) #t)
+    ((('NUM?) ('SYM?)) #t)
+    ((('NUM?) ('EQ? (? symbol?))) #t)
+    ((('NUM?) ('EQ? ())) #t)
+    ((('EQ? x) ('EQ? x)) #f)
+    ((('EQ? x) ('EQ? y)) #t)
+    ((('EQ? _) ('CONS?)) #t)
+    ((_ _) #f)))
+
+;;; then there's some stuff following from particular descriptions too:
+(define (implies d)
+  (match d
+    (('CONS?) '((not (ATM?))
+                (not (NIL?))
+                (not (SYM?))
+                (not (NUM?))))
+    (('not ('CONS?)) '((ATM?)))
+    (('NIL?) '((ATM?)
+               (not (SYM?))
+               (not (NUM?))
+               (not (CONS?))))
+    (('ATM?) '((not (CONS?))))
+    (('not ('ATM?)) '((CONS?)))
+    (('NUM?) '((ATM?)
+               (not (SYM?))
+               (not (NIL?))
+               (not (CONS?))))
+    (('SYM?) '((ATM?)
+               (not (NUM?))
+               (not (NIL?))
+               (not (CONS?))))
+    (('EQ? ()) '((ATM?)
+                 (NIL?)
+                 (not (SYM?))
+                 (not (NUM?))
+                 (not (CONS?)))) ;; shouldn't happen...?
+    (('EQ? (? number?)) '((ATM?)
+                          (NUM?)
+                          (not (NIL?))
+                          (not (SYM?))
+                          (not (CONS?))))
+    (('EQ? (? symbol?)) '((ATM?)
+                          (SYM?)
+                          (not (NIL?))
+                          (not (NUM?))
+                          (not (CONS?))))
+    (_ '())))
+
+;;; and the "heavieast" stuff; mind they're mutually exclusive:
+(define (infered ds)
+  (cond ((and (member? '(not (NUM?)) ds)
+              (member? '(not (NIL?)) ds)
+              (member? '(ATM?) ds))
+         '((SYM?)))
+        ((and (member? '(not (SYM?)) ds)
+              (member? '(not (NIL?)) ds)
+              (member? '(ATM?) ds))
+         '((NUM?)))
+        ((and (member? '(not (SYM?)) ds)
+              (member? '(not (NUM?)) ds)
+              (member? '(ATM?) ds))
+         '((NIL?)))
+        (else '())))
+
+;;; so NOW we can compute entailments (sort of):
+(define (inf-closure ds)
+  (let* ((ds* (apply union ds (map implies ds)))
+         (ds** (union ds* (infered ds*))))
+    ds**))
+
+(e.g. (inf-closure '((not (CONS?)) (EQ? qwe)))
+      ===> ((not (NUM?)) (not (NIL?)) (SYM?) (ATM?) (not (CONS?)) (EQ? qwe)))
+
+(e.g. (inf-closure '((not (CONS?)) (not (NUM?)) (not (NIL?))))
+      ===> ((SYM?) (ATM?) (not (CONS?)) (not (NUM?)) (not (NIL?))))
+
+;;; and *NOW* ladies and gentlement, the big thing:
+(define (inconsistent? ds)
+  (let ((ds* (inf-closure ds)))
+    (any (lambda (d) (any (contradicts? d) ds*)) ds*)))
+
+(e.g. (inconsistent? '((CONS?) (ATM?))))
+(e.g. (inconsistent? '((not (CONS?)) (not (ATM?)))))
+(e.g. (inconsistent? '((CONS?) (SYM?))))
+(e.g. (inconsistent? '((EQ? x) (NUM?))))
+(e.g. (inconsistent? '((EQ? x) (not (ATM?)))))
+(e.g. (inconsistent? '((EQ? map) (EQ? apd))))
+(e.g. (not (inconsistent? '((EQ? map) (EQ? map)))))
+(e.g. (not (inconsistent? '((EQ? map) (SYM?)))))
+(e.g. (not (inconsistent? '((EQ? map) (not (NUM?))))))
+
+;;; dadaam:
+(define (consistent? ds) (not (inconsistent? ds)))
+
+
+;;; easy, right? we have all the tools to decide which of the already
+;;; tested/computed tests can be skipped by careful magical analysis,
+;;; aka "the actual magic happens here":
+
+(define (outcome-analysis #;of test #;given passed failed all-tests)
+  (cond ((member? test passed) 'PASSED)
+        ((member? test failed) 'FAILED)
+        (else ;; madness starts here:
+         (let* ((address (cadr test)) ;;; hahaha
+                (desc (description<-test test)) 
+                (aliases (address-aliases address all-tests))
+                (passed* (all-tests-concerning aliases passed))
+                (failed* (all-tests-concerning aliases failed))
+                (descs-P (descriptions<-tests passed*))
+                (descs-F (descriptions<-tests failed*))
+                (consistent-P+t? (consistent? `(,desc . ,descs-P)))
+                (consistent-F+t? (consistent? `(,desc . ,descs-F))))
+           (cond ((and consistent-P+t? (not consistent-F+t?)) 'PASSED)
+                 ((and (not consistent-P+t?) consistent-F+t?) 'FAILED)
+                 ((and consistent-P+t? consistent-F+t?) 'BOTH)
+                 ((and (not consistent-P+t?) (not consistent-F+t?)) 'IMPOSSIBLE)
+                 (else (error 'quintus-non-datur))))))) ;;; wat?
+
+;;; i've no idea how to test it and it feels like lacking something...
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; 3. now THIS is the core of our poor man's driving:
+
+(define (new-block pp code LVA all-tests)
+  ;; assert (equal? LVA (live-tests code)) and also
+  ;; assert (equal? all-tests (all-tests code)) y'know
   (let* ((lbl (pp-lbl pp))
          (passed (pp-passed pp))
          (failed (pp-failed pp))
          (old-code (lookup (pp-lbl pp) code)))
   (match old-code 
     ((('IF test lbl-then 'ELSE lbl-else))
-     (cond ((member? test passed)
-            (let* ((pp-then (ppoint lbl-then passed failed LVA))
-                   (new-code `((GOTO ,pp-then))))
-              `(,pp . ,new-code)))
-           ((member? test failed)
-            (let* ((pp-else (ppoint lbl-else passed failed LVA))
-                   (new-code `((GOTO ,pp-else))))
-              `(,pp . ,new-code)))
-           (else
-            (let* ((pp-then
-                    (ppoint lbl-then `(,test . ,passed) failed LVA))
-                   (pp-else
-                    (ppoint lbl-else passed `(,test . ,failed) LVA))
-                   (new-code
-                    `((IF ,test ,pp-then ELSE ,pp-else))))
-              `(,pp . ,new-code)))))
-    ((('GOTO lbl-jmp))
+     (match (outcome-analysis #;of test #;given passed failed all-tests)
+       ('PASSED (let* ((pp-then (ppoint lbl-then passed failed LVA))
+                       (new-code `((GOTO ,pp-then))))
+                  `(,pp . ,new-code)))
+       ('FAILED (let* ((pp-else (ppoint lbl-else passed failed LVA))
+                       (new-code `((GOTO ,pp-else))))
+                  `(,pp . ,new-code)))
+       ('BOTH (let* ((pp-then
+                      (ppoint lbl-then `(,test . ,passed) failed LVA))
+                     (pp-else
+                      (ppoint lbl-else passed `(,test . ,failed) LVA))
+                     (new-code
+                      `((IF ,test ,pp-then ELSE ,pp-else))))
+                `(,pp . ,new-code)))
+       ('IMPOSSILBE `(,pp (RETURN 'look-this-point-is-unreachable)))))
+
+    ((('GOTO lbl-jmp)) ;; sure??
      (let* ((pp-jmp (ppoint lbl-jmp passed failed LVA))
             (new-code `((GOTO ,pp-jmp))))
        `(,pp . ,new-code)))
+
     ((lets ... ('RETURN e))
       (let* ((new-code `(,@(massaged-lets lets LVA) (RETURN ,e))))
         `(,pp . ,new-code)))
+
     ((lets ... ('GOTO lbl-jmp)) ;;; ignore passed and failed there:
       (let* ((pp-jmp (ppoint lbl-jmp '() #;passed '() #;failed LVA))
              (new-code `(,@(massaged-lets lets LVA) (GOTO ,pp-jmp))))
@@ -195,7 +505,8 @@
 (e.g.
  (new-block (ppoint '(0 2) '((EQ? (CAR *VIEW*) 'APD)) '() (live-tests test123))
             test123
-            (live-tests test123))
+            (live-tests test123)
+            (all-tests test123))
  ===> ([(0 2) ((EQ? (CAR *VIEW*) 'APD)) ()]
        (IF (CONS? (CDR *VIEW*))
            [(0 3) ((CONS? (CDR *VIEW*)) (EQ? (CAR *VIEW*) 'APD)) ()]
@@ -207,7 +518,8 @@
 (e.g.
  (new-block (ppoint '(0 2) '((CONS? (CDR *VIEW*))) '() (live-tests test123))
             test123
-            (live-tests test123))
+            (live-tests test123)
+            (all-tests test123))
  ===> ([(0 2) ((CONS? (CDR *VIEW*))) ()]
        (GOTO [(0 3) ((CONS? (CDR *VIEW*))) ()])))
 ;;; so there's no need to build IF statement, only jump to "true branch",
@@ -217,7 +529,8 @@
 (e.g.
  (new-block (ppoint '(0 2) '() '((CONS? (CDR *VIEW*))) (live-tests test123))
             test123
-            (live-tests test123))
+            (live-tests test123)
+            (all-tests test123))
  ===> ([(0 2) () ((CONS? (CDR *VIEW*)))]
        (GOTO [(1 0) () ((CONS? (CDR *VIEW*)))])))
 ;;; similarly only "else branch" jump and preserving knowledge about test failed
@@ -233,13 +546,13 @@
 
 ;;; we'll now generate (0 2)'s version where nothing is known about tests:
 (e.g. (new-block (ppoint '(0 2) '() '() (live-tests test123))
-                                test123 (live-tests test123))
+                                test123 (live-tests test123) (all-tests test123))
       ===> ([(0 2) () ()]
             (IF (CONS? (CDR *VIEW*)) [(0 3) ((CONS? (CDR *VIEW*))) ()]
                 ELSE [(1 0) () ((CONS? (CDR *VIEW*)))])))
 ;;; and we can easily get both possible futures (ppoints) of it:
 (e.g. (successor-pps (new-block (ppoint '(0 2) '() '() (live-tests test123))
-                                test123 (live-tests test123)))
+                                test123 (live-tests test123) (all-tests test123)))
       ===> ([(0 3) ((CONS? (CDR *VIEW*))) ()]
             [(1 0) () ((CONS? (CDR *VIEW*)))]))
 ;;; sweet.
@@ -247,18 +560,22 @@
 ;;; surprisingly that was all needed to process entire compiled program
 (define (residual passed failed code)
   (let ((first-lbl (caar code)) ;; XD
-        (LTA (live-tests code)))
+        (LTA (live-tests code))
+        (all-tests (all-tests code)))
     (let ride ((pending `(,(ppoint first-lbl passed failed LTA)))
                (new-code '()))
       (match pending
         (() new-code)
         ((pp . pending*) (match (lookup pp new-code)
-                           (#f (let* ((block (new-block pp code LTA))
+                           (#f (let* ((block (new-block pp code LTA all-tests))
                                       (futures (successor-pps block)))
                                  (ride (append futures pending*)
                                        `(,@new-code ,block))))
                            (_ (ride pending* new-code))))))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; 4. prettify&simplify...
 ;;; we'll see the outputs in a minute since now they're barely readable
 ;;; because (a) ppoints-as-labels was handy but not friendly, (b) there
 ;;; are now tons of GOTO-threads which require compressing.
@@ -373,7 +690,7 @@
               (RETURN 'whoa))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; this all sums up to very crude and super slow optimizer:
+;;; 5. this all sums up to very crude and super slow optimizer:
 (define (optimized code)
   (simplified-labels
    (with-dead-code-removed
@@ -415,9 +732,8 @@
 ;;; - rev     |   505 |  342 | 0.67 (!)
 
 ;;; we expect the ratio to go lower as the programs get bigger and
-;;; more interpretive; however as of now it seems to get stuck when
-;;; trying to compile lisp0, which quite well might be combinatorial
-;;; explossion. we have another idea but, again, that'll have to wait
-;;; for approx. 2 weeks... tbc!
-
+;;; more interpretive. after adding the descriptions-logic thing
+;;; now lisp0 compiles in ~5min but it doesn't work correctly haha
+;;; also CPSized stuff seems broken now. it's weird p3 works ok...
+;;; TBC!
 
