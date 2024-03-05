@@ -6,8 +6,6 @@
 (define compiled (@ (pindolf compiler) compiled))
 (define run (@ (pindolf vm) run))
 
-(define ((equals? x) y) (equal? x y)) ;; handy in patterns...
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (lookup key #;in binding)
   (match binding
@@ -205,9 +203,9 @@
   (define (all-aliases-for a #;in ts)
     (match ts
       (() '())
-      ((('EQ? (? (equals? a)) (? address? a*)) . ts*)
+      ((('EQ? (? (is _ equal? a)) (? address? a*)) . ts*)
        `(,a* . ,(all-aliases-for a ts*)))
-     ((('EQ? (? address? a*) (? (equals? a))) . ts*)
+     ((('EQ? (? address? a*) (? (is _ equal? a))) . ts*)
       `(,a* . ,(all-aliases-for a ts*)))
      ((_ .  ts*)
       (all-aliases-for a ts*))))  
@@ -233,13 +231,13 @@
 ;;; ok, now we need all the tests concerning whichever of these addresses:
 (define (all-tests-concerning-one address tests)
   (filter (lambda (t) (match t
-                   (('NIL? (? (equals? address))) #t)
-                   (('ATM? (? (equals? address))) #t)
-                   (('SYM? (? (equals? address))) #t)
-                   (('NUM? (? (equals? address))) #t)
-                   (('EQ? (? (equals? address)) _) #t)
-                   (('EQ? _ (? (equals? address))) #t)
-                   (('CONS? (? (equals? address))) #t)
+                   (('NIL? (? (is _ equal? address))) #t)
+                   (('ATM? (? (is _ equal? address))) #t)
+                   (('SYM? (? (is _ equal? address))) #t)
+                   (('NUM? (? (is _ equal? address))) #t)
+                   (('CONS? (? (is _ equal? address))) #t)
+                   (('EQ? (? (is _ equal? address)) _) #t)
+                   (('EQ? _ (? (is _ equal? address))) #t)
                    (_ #f)))
           tests))
 
@@ -309,6 +307,14 @@
        (all-tests-concerning '((CAR *VIEW*)
                                (CAR (CDR *VIEW*))) (all-tests test123)))
       ===> ((NIL?) (CONS?) (EQ? APD)))
+
+;;; for managing failed tests too:
+(define (negated-descriptions ds)
+  (map (lambda (d) (normalized `(not ,d))) ds))
+
+(e.g. (negated-descriptions '((NIL?) (ATM?) (not (CONS?))))
+      ===> ((not (NIL?)) (not (ATM?)) (CONS?)))
+
 
 ;;; it's not hard (only maybe a bit tedious) to figure out when two descriptions
 ;;; can't be simultainously satisfied:
@@ -437,21 +443,21 @@
         ((member? test failed) 'FAILED)
         (else ;; madness starts here:
          (let* ((address (cadr test)) ;;; hahaha
-                (desc (description<-test test)) 
-                (aliases (address-aliases address all-tests))
+                (desc-t (description<-test test))
+                (desc-~t (normalized `(not ,desc-t)))
+                (aliases (address-aliases address passed))
                 (passed* (all-tests-concerning aliases passed))
                 (failed* (all-tests-concerning aliases failed))
-                (descs-P (descriptions<-tests passed*))
-                (descs-F (descriptions<-tests failed*))
-                (consistent-P+t? (consistent? `(,desc . ,descs-P)))
-                (consistent-F+t? (consistent? `(,desc . ,descs-F))))
-           (cond ((and consistent-P+t? (not consistent-F+t?)) 'PASSED)
-                 ((and (not consistent-P+t?) consistent-F+t?) 'FAILED)
-                 ((and consistent-P+t? consistent-F+t?) 'BOTH)
-                 ((and (not consistent-P+t?) (not consistent-F+t?)) 'IMPOSSIBLE)
-                 (else (error 'quintus-non-datur))))))) ;;; wat?
-
-;;; i've no idea how to test it and it feels like lacking something...
+                (descs (append (descriptions<-tests passed*)
+                               (negated-descriptions
+                                (descriptions<-tests failed*))))
+                (consistent-with-t? (consistent? `(,desc-t . ,descs)))
+                (consistent-with-~t? (consistent? `(,desc-~t . ,descs))))
+           (cond ((and consistent-with-t?
+                       consistent-with-~t?) 'BOTH)
+                 (consistent-with-t? 'PASSED)
+                 (consistent-with-~t? 'FAILED)
+                 (else 'IMPOSSIBLE))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; 3. now THIS is the core of our poor man's driving:
@@ -555,9 +561,8 @@
                                 test123 (live-tests test123) (all-tests test123)))
       ===> ([(0 3) ((CONS? (CDR *VIEW*))) ()]
             [(1 0) () ((CONS? (CDR *VIEW*)))]))
-;;; sweet.
 
-;;; surprisingly that was all needed to process entire compiled program
+;;; sweet.
 (define (residual passed failed code)
   (let ((first-lbl (caar code)) ;; XD
         (LTA (live-tests code))
@@ -731,9 +736,11 @@
 ;;; - map dup |   888 |  712 | 0.80
 ;;; - rev     |   505 |  342 | 0.67 (!)
 
-;;; we expect the ratio to go lower as the programs get bigger and
-;;; more interpretive. after adding the descriptions-logic thing
-;;; now lisp0 compiles in ~5min but it doesn't work correctly haha
-;;; also CPSized stuff seems broken now. it's weird p3 works ok...
-;;; TBC!
+;;; upd, PinP compiled with new version, 3-fold speedup
+;;; when interpreting P3 tests:
+;;; apd     | 122905 | 44395 | 0.36
+;;; map dbl | 235431 | 85046 | 0.36
+;;; map dup | 233925 | 84299 | 0.36
+;;; rev     | 121685 | 44442 | 0.36
 
+;;; it still seems to produce some garbage though. tbc
