@@ -563,10 +563,23 @@
             [(1 0) () ((CONS? (CDR *VIEW*)))]))
 
 ;;; sweet.
+
+;;; 2024/03/13 wait don't do this LTA! the whole problem was super silly
+;;; once the (EQ? <address> <const0>) test was performed we forgot it, so
+;;; it couldn't be used to resolve (EQ? <address> <const1>).
+;;; it really should be live variable analysis, not live test analysis;
+;;; and not even that because of equalities (EQ? <address0> <address1>).
+;;; there's a neat way to resolve all these problems, for now just pretend
+;;; all the tests are relevant everywhere and nevermind duplicated leaves:
+(define (fake-lta code)
+  (let* ((all (all-tests code)))
+    (map (lambda ((lbl . code)) `(,lbl . ,all)) code)))
+
+
 (define (residual passed failed code)
   (let ((first-lbl (caar code)) ;; XD
         (LTA (live-tests code))
-        (all-tests (all-tests code)))
+        (all-tests (fake-lta #;all-tests code)))
     (let ride ((pending `(,(ppoint first-lbl passed failed LTA)))
                (new-code '()))
       (match pending
@@ -744,3 +757,15 @@
 ;;; rev     | 121685 | 44442 | 0.36
 
 ;;; it still seems to produce some garbage though. tbc
+
+;;; upd 2024/03/13 i found it! for now it's just patched but already
+;;; few hundred cals to (value _ _) less per run, and 10x less produced nodes
+;;; (and produced pipn in 7min, not 40).
+;;; test    |  bez   |  zzz  | r
+;;; apd     | 122905 | 44299 | 0.360
+;;; map dbl | 235431 | 84890 | 0.360
+;;; map dup | 233925 | 84143 | 0.359
+;;; rev     | 121685 | 44398 | 0.364
+
+;;; with the new driver it'll be even smaller and faster since we're getting
+;;; rid of post-processing phase, tbc!
