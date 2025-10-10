@@ -27,9 +27,9 @@
   (LET e (CAR (CDR (CDR *VIEW*))))
   (LET op (CAR (CDR *VIEW*)))
   (LET *VIEW* (CONS 'fold-r (CONS op (CONS e (CONS xs ())))))
-  (LET (V 0) (CALL (0) *VIEW*))
+  (LET (V 0) (CALL (0 0) *VIEW*))
   (LET *VIEW* (CONS op (CONS x (CONS (V 0) ()))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((2 0) (IF (CONS? *VIEW*) (2 1) ELSE (3 0)))
  ((2 1) (IF (EQ? (CAR *VIEW*) 'cons) (2 2) ELSE (3 0)))
  ((2 2) (IF (CONS? (CDR *VIEW*)) (2 3) ELSE (3 0)))
@@ -48,7 +48,7 @@
   (LET ys (CAR (CDR (CDR *VIEW*))))
   (LET xs (CAR (CDR *VIEW*)))
   (LET *VIEW* (CONS 'fold-r (CONS 'cons (CONS ys (CONS xs ())))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((4 0) (IF (CONS? *VIEW*) (4 1) ELSE (5 0)))
  ((4 1) (IF (CONS? (CAR *VIEW*)) (4 2) ELSE (5 0)))
  ((4 2) (IF (EQ? (CAR (CAR *VIEW*)) 'cons*f.hd) (4 3) ELSE (5 0)))
@@ -62,9 +62,9 @@
   (LET h (CAR (CDR *VIEW*)))
   (LET f (CAR (CDR (CAR *VIEW*))))
   (LET *VIEW* (CONS f (CONS h ())))
-  (LET (V 0) (CALL (0) *VIEW*))
+  (LET (V 0) (CALL (0 0) *VIEW*))
   (LET *VIEW* (CONS 'cons (CONS (V 0) (CONS t ()))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((5 0) (IF (CONS? *VIEW*) (5 1) ELSE (6 0)))
  ((5 1) (IF (EQ? (CAR *VIEW*) 'map) (5 2) ELSE (6 0)))
  ((5 2) (IF (CONS? (CDR *VIEW*)) (5 3) ELSE (6 0)))
@@ -76,7 +76,7 @@
   (LET *VIEW*
        (CONS 'fold-r
              (CONS (CONS 'cons*f.hd (CONS f ())) (CONS () (CONS xs ())))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((6 0) (IF (CONS? *VIEW*) (6 1) ELSE (7 0)))
  ((6 1) (IF (EQ? (CAR *VIEW*) 'dup) (6 2) ELSE (7 0)))
  ((6 2) (IF (CONS? (CDR *VIEW*)) (6 3) ELSE (7 0)))
@@ -95,7 +95,7 @@
  ((8 4)
   (LET xs (CAR (CDR *VIEW*)))
   (LET *VIEW* (CONS 'rev (CONS xs (CONS () ()))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((9 0) (IF (CONS? *VIEW*) (9 1) ELSE (10 0)))
  ((9 1) (IF (EQ? (CAR *VIEW*) 'rev) (9 2) ELSE (10 0)))
  ((9 2) (IF (CONS? (CDR *VIEW*)) (9 3) ELSE (10 0)))
@@ -114,7 +114,7 @@
   (LET xs (CDR (CAR (CDR *VIEW*))))
   (LET x (CAR (CAR (CDR *VIEW*))))
   (LET *VIEW* (CONS 'rev (CONS xs (CONS (CONS x rs) ()))))
-  (GOTO (0)))
+  (GOTO (0 0)))
  ((11 0) (RETURN 'no-match))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -201,6 +201,93 @@
 
 ;;; ...which should allow pruning driving by a lot even without our
 ;;; funky expression-logic.scm (for now).
+
+(define (relevant-info #;from info #;wrt tests)
+  (match info
+    (() '())
+    ((('not t) . info*) (if (member? t tests)
+                            `((not ,t) . ,(relevant-info info* tests))
+                            (relevant-info info* tests)))
+    ((t . info*) (if (member? t tests)
+                     `(,t . ,(relevant-info info* tests))
+                     (relevant-info info* tests)))))
+
+;; hey kid, rock'n'roll, nobody tells you where to go
+(define (drive pp info src0 
+               src tmap leaves) ;; -> (pp* src**)
+  (cond
+   ((lookup `(,pp ,info) src0)`((,pp ,info) ,src0)) ;; already seen!
+   ((member? pp leaves) (let* ((pp* pp #;`(,pp ,info)) ;; sic!
+                               (block* (block-for pp src))
+                               (src1 `(,@src0 (,pp* . ,block*))))
+                          `(,pp* ,(if (lookup pp* src0) src0 src1))))
+   (else
+    (let* (((('IF test tpp 'ELSE fpp)) (block-for pp src))
+           (ti (relevant-info #;from (union info `(,test))
+                              #;wrt (lookup tpp tmap)))
+           (fi (relevant-info #;from (union info `((not ,test)))
+                              #;wrt (lookup fpp tmap))))
+      (cond ((member? test info)
+             (drive tpp ti src0 src tmap leaves))
+            ((member? `(not ,test) info)
+             (drive fpp fi src0 src tmap leaves))
+            (else
+             (let* ((pp* `(,pp ,info))
+                    ((tpp* src1) (drive tpp ti
+                                        src0 src tmap leaves))
+                    ((fpp* src2) (drive fpp fi 
+                                        src1 src tmap leaves)))
+               (cond ((equal? tpp* fpp*)
+                      `(,tpp* ,src2)) ;; sure?
+                     ((lookup pp* src2)
+                      `(,pp* ,src2))
+                     (else 
+                      (let* ((src3 `(,@src2
+                                     (,pp* (IF ,test ,tpp* ELSE ,fpp*)))))
+                        `(,pp* ,src3)))))))))))
+
+[define [lookupN k d] [or [lookup k d] 0]] ;;; XD quickfix magic sorry
+
+(define (update-block #;in block #;wrt pp-map)
+  (match block
+    ((('RETURN e))
+     block)
+    ((('GOTO pp))
+     `((GOTO ,(lookupN pp pp-map))))
+    ((('IF t pp-t 'ELSE pp-f))
+     `((IF ,t ,(lookup pp-t pp-map) ELSE ,(lookup pp-f pp-map))))
+    ((('LET v ('CALL pp e)) . block*)
+     `((LET ,v (CALL ,(lookupN pp pp-map) ,e))
+       . ,(update-block block* pp-map)))
+    ((('LET v e) . block*)
+     `((LET ,v ,e) . ,(update-block block* pp-map)))))
+
+    
+(define (simplify-pps src)
+  (let* ((src (reverse src)) ;; he_he
+         (old-pps (map car src))
+         (new-pps (iota (length old-pps)))
+         (pp-map (map cons old-pps new-pps)))
+    (map (lambda ((pp . block))
+           (let* ((pp* (lookup pp pp-map))
+                  (block* (update-block block pp-map)))
+             `(,pp* . ,block*)))
+         src)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(let* ((src prg1)
+       (p-map (predecs-map src))
+       (t-map (tests-map src p-map))
+       (leaves-pp (filter-map (lambda ((pp . block)) (and (is-leaf? block) pp))
+                              src))
+       (start-pp '(0 0))
+       (start-info '())
+       ((npp new-src) (drive start-pp start-info '()
+                             src t-map leaves-pp))
+       (new-src* (simplify-pps new-src)))
+  (pretty-print new-src*))
+
+;; cf TEST-0.scm for what happened next...
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1212,3 +1299,27 @@
  ((10 5) (NIL? (CDR (CDR (CDR *VIEW*)))))
  ((10 6))
  ((11 0))) )
+
+
+(e.g. (relevant-info '((CONS? *a*))
+                     '((CONS? *a*) (NUM? (CAR *a*))))
+      ===> ((CONS? *a*)))
+
+(e.g. (relevant-info '((not (CONS? *a*)))
+                     '((CONS? *a*) (NUM? (CAR *a*))))
+      ===> ((not (CONS? *a*))))
+
+(e.g. (relevant-info '((CONS? *b*))
+                     '((CONS? *a*) (NUM? (CAR *a*))))
+      ===> ())
+
+
+(e.g. (relevant-info '((CONS? *a*)
+                       (not (CONS (CDR *a*)))
+                       (EQ? (CAR *a*) 'foo))
+                     '((CONS? *a*)
+                       (CONS (CDR *a*))
+                       (CONS (CDR (CDR *a*)))))
+      ===> ((CONS? *a*)
+            (not (CONS (CDR *a*)))))
+
