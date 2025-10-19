@@ -1,0 +1,222 @@
+(use-modules (grand scheme))
+;;; something about leaves? (experimental)
+
+(define np1
+  '((LET x (CAR v))
+    (LET y (CDR v))
+    (LET r0 (APP (CONS 'elo (CONS (CONS x x) '()))))
+    (RET (CONS r0 y))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (binop? x) (equal? x 'CONS))
+(define (uniop? x) (member? x '(CAR CDR APP)))
+
+(define (FC-expr expr nn env)
+  (match expr
+    (((? binop? op) e0 e1) (let* (((c0 n0) (FC-expr e0 nn env))
+                                  ((c1 n1) (FC-expr e1 (1+ n0) env))
+                                  (n2 (1+ n1))
+                                  (c2 `((,n2 (,op ,n0 ,n1)))))
+                             `((,@c0 ,@c1 ,@c2) ,n2)))
+    (((? uniop? op) e0) (let* (((c0 n0) (FC-expr e0 nn env))
+                               (n1 (1+ n0))
+                               (c1 `((,n1 (,op ,n0)))))
+                          `((,@c0 ,@c1) ,n1)))
+    ((? symbol? v) (let* ((e (match (assoc v env)
+                               (#f v)
+                               ((_ . n) n))))
+                     `(((,nn ,e)) ,nn)))
+    (e `(((,nn ,e)) ,nn))))
+
+(define (FC-leaf leaf)
+  (let loop ((pend leaf)
+             (res '())
+             (env '())
+             (next-n 0))
+    (match pend
+      ((('RET e))
+       (let* (((c n) (FC-expr e next-n env)))
+         (append res c)))
+      ((('LET v e) . pend*)
+       (let* (((c n) (FC-expr e next-n env))
+              (env* `((,v . ,n) . ,env))
+              (res* (append res c))
+              (next-n* (1+ n)))
+         (loop pend* res* env* next-n*))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (ddnum n subs)
+  (match (assoc n subs)
+    (#f n)
+    ((_ . n*) n*)))
+
+(define (seen? e res)
+  (let seek ((todo res))
+    (match todo
+      (() #f)
+      (((n e*) . todo*) (if (equal? e e*)
+                            n
+                            (seek todo*))))))
+
+(define (simplified expr #;wrt subs)
+  (match expr
+    (((? binop? op) n m) `(,op ,(ddnum n subs) ,(ddnum m subs)))
+    (((? uniop? op) n) `(,op ,(ddnum n subs)))
+    (_ expr)))
+
+(define (dedup-FC fc)
+  (let loop ((pend fc)
+             (res '())
+             (subs '()))
+    (match pend
+      (()
+       res)
+      (((n (? number? m)) . pend*)
+       (loop pend* res `((,n . ,m) . ,subs)))
+      (((n e) . pend*)
+       (let* ((e* (simplified e subs)))
+         (match (seen? e* res)
+           ((? number? n*) (loop pend* res `((,n . ,n*) . ,subs)))
+           (#f             (loop pend* `(,@res (,n ,e*)) subs))))))))
+
+(define (simp-FC fc)
+  (let loop ((pend fc)
+             (res '()))
+    (match pend
+      (()
+       res)
+      (((n ('CAR m)) . pend*)
+       (match (assoc m res)
+         ((m ('CONS k l)) (loop pend* `(,@res (,n ,k))))
+         (_ (loop pend* `(,@res (,n (CAR ,m)))))))
+      (((n ('CDR m)) . pend*)
+       (match (assoc m res)
+         ((m ('CONS k l)) (loop pend* `(,@res (,n ,l))))
+         (_ (loop pend* `(,@res (,n (CAR ,m)))))))
+      ((cmd . pend*) (loop pend* `(,@res ,cmd))))))
+
+
+(define (undead-FC fc)
+  (let loop ((pend `(,(car (last fc))))
+             (res '()))
+    (match pend
+      (() res)
+      ((n . pend*)
+       (if (assoc n res)
+           (loop pend* res)
+           (match (assoc n fc)
+             ((n ((? binop? op) m m*)) (loop `(,m ,m* . ,pend*)
+                                             `((,n (,op ,m ,m*)) . ,res)))
+             ((n ((? uniop? op) m)) (loop `(,m . ,pend*)
+                                          `((,n (,op ,m)) . ,res)))
+             ((n e) (loop pend* `((,n ,e) . ,res)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(e.g. (FC-expr ''elo 0 '()) ===> (((0 'elo))
+                                  0))
+
+(e.g. (FC-expr '(CONS 'a 'b) 0 '()) ===> (((0 'a)
+                                           (1 'b)
+                                           (2 (CONS 0 1)))
+                                          2))
+
+(e.g. (FC-expr '(CONS (CONS x x) '()) 1 '((x . 0)))
+      ===> (((1 0)
+             (2 0)
+             (3 (CONS 1 2))
+             (4 '())
+             (5 (CONS 3 4)))
+            5))
+
+(e.g. (FC-expr '(CAR (CONS x x)) 0 '()) ===> (((0 x)
+                                               (1 x)
+                                               (2 (CONS 0 1))
+                                               (3 (CAR 2)))
+                                              3))
+
+
+(e.g. (FC-leaf '((RET (CONS 'a 'b)))) ===>
+      ((0 'a)
+       (1 'b)
+       (2 (CONS 0 1))))
+
+(e.g. (FC-leaf '((LET x (CONS 'a 'b))
+                 (LET y (CONS x x))
+                 (RET y)))
+      ===> ((0 'a)
+            (1 'b)
+            (2 (CONS 0 1))
+            (3 2)
+            (4 2)
+            (5 (CONS 3 4))
+            (6 5)))
+
+(e.g. (FC-leaf '((LET x (CAR v))
+                 (RET (CONS x x)))) ===> ((0 v)
+                                          (1 (CAR 0))
+                                          (2 1)
+                                          (3 1)
+                                          (4 (CONS 2 3))))
+
+(e.g. (FC-leaf np1) ===> ((0 v)
+                          (1 (CAR 0))
+                          (2 v)
+                          (3 (CDR 2))
+                          (4 'elo)
+                          (5 1)
+                          (6 1)
+                          (7 (CONS 5 6))
+                          (8 '())
+                          (9 (CONS 7 8))
+                          (10 (CONS 4 9))
+                          (11 (APP 10))
+                          (12 11)
+                          (13 3)
+                          (14 (CONS 12 13))))
+
+(e.g. (ddnum 3 '((3 . 1) (2 . 0))) ===> 1)
+(e.g. (ddnum 3 '((2 . 1))) ===> 3)
+
+
+(e.g. (seen? '(CONS 1 2)
+             '((0 'elo)
+               (1 'a)
+               (2 (CONS 0 0))
+               (3 (CONS 1 2)))) ===> 3)
+
+(e.g. (seen? '(CONS 2 1)
+             '((0 'elo)
+               (1 'a)
+               (2 (CONS 0 0))
+               (3 (CONS 1 2)))) ===> #f)
+
+(e.g. (simplified '(CONS 7 8) '((7 . 1) (8 . 0))) ===> (CONS 1 0))
+(e.g. (simplified ''elo '()) ===> 'elo)
+
+(e.g. (dedup-FC (FC-leaf np1)) ===> ((0 v)
+                                     (1 (CAR 0))
+                                     (3 (CDR 0))
+                                     (4 'elo)
+                                     (7 (CONS 1 1))
+                                     (8 '())
+                                     (9 (CONS 7 8))
+                                     (10 (CONS 4 9))
+                                     (11 (APP 10))
+                                     (14 (CONS 11 3))))
+
+(e.g. (simp-FC '((0 'hi)
+                 (1 'there)
+                 (2 (CONS 0 1))
+                 (3 (CAR 2)))) ===> ((0 'hi)
+                                     (1 'there)
+                                     (2 (CONS 0 1))
+                                     (3 0)))
+
+
+(e.g. (undead-FC '((0 'elo)
+                   (1 'boo)
+                   (2 (CONS 0 1))
+                   (3 (CONS 1 0))
+                   (4 (CONS 1 1)))) ===> ((1 'boo)
+                                          (4 (CONS 1 1))))
+
