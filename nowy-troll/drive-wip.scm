@@ -425,9 +425,29 @@
             (LET *VIEW* (CONS 'APD (CONS xs (CONS (V 0) ()))))
             (GOTO 0)))
 
+(define (b-signature e)
+  (match e
+    (('CONS h t) `(CONS ,(b-signature h) ,(b-signature t)))
+    (('CALL _ _) (gensym "?"))
+    (('CAR _) (gensym "?"))
+    (('CDR _) (gensym "?"))
+    (('+ _ _) (gensym "?N"))
+    (('- _ _) (gensym "?N"))
+    (('* _ _) (gensym "?N"))
+    (_ e)))
+
+(define (starts-with-qm? s) (eq? (car (string->list (symbol->string s))) #\?))
+
+(define (b2-signature e)
+  (match e
+    (('CONS h t) `(,(b2-signature h) . ,(b2-signature t)))
+    ((? symbol? s) (if (starts-with-qm? s) '* s)) ;; there should be no other but
+    (_ e)))
+
+
 (define (xtracted-callz mleaf)
   (match mleaf
-    (('CALL 0 e) `((,e) . ,(xtracted-callz e)))
+    (('CALL 0 e) `(,(b-signature e) . ,(xtracted-callz e)))
     (('CONS h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))
     (('+ h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))   
     (('- h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))
@@ -438,14 +458,35 @@
        (massaged-leaf '(BINDING ()
                         BODY (+ (& (MUL ,n ,m))
                                 (& (REM ,n ,m))))))
-      ===> (((CONS 'MUL (CONS n (CONS m ()))))
-            ((CONS 'REM (CONS n (CONS m ()))))))
+      ===> ((CONS 'MUL (CONS n (CONS m ())))
+            (CONS 'REM (CONS n (CONS m ())))))
 
 (let* ((prog (with-input-from-file "drc.ppf" read) #;p1)
-       (tree0 (mk-tree (clauses->rM prog) '*))
+       (rM (clauses->rM prog))
+       (tree0 (mk-tree rM '*))
        (lvs0 (leaves tree0))
        (lvs0* (map massaged-leaf lvs0))
-       (gen1-calls (apply append (map xtracted-callz lvs0*))))
-  (map (lambda (c) (write c) (newline) 23) gen1-calls)
-  (pretty-print `(XTRACTED ,(length gen1-calls) GEN-1 CALLS))
+       (gen1-calls (apply append (map xtracted-callz lvs0*)))
+       (ug1 (delete-duplicates (map b2-signature gen1-calls)))
+       (trees1 (map (lambda (c) (mk-tree rM c)) gen1-calls))
+       (lvs1 (apply append (map leaves trees1)))
+       (lvs1* (map massaged-leaf lvs1))
+       (gen2-calls (apply append (map xtracted-callz lvs1*)))
+       (ug2 (delete-duplicates (map b2-signature gen2-calls)))
+       (trees2 (map (lambda (c) (mk-tree rM c)) gen2-calls))
+       (lvs2 (apply append (map leaves trees2)))
+       (lvs2* (map massaged-leaf lvs2))
+       (gen3-calls (apply append (map xtracted-callz lvs2*)))
+       (ug3 (delete-duplicates (map b2-signature gen3-calls))))
+  ;(map (lambda (c) #;(write c) #;(newline) (pretty-print c) 23) ug2)
+  (pretty-print `(XTRACTED ,(length gen1-calls) GEN-1 CALLS, ,(length ug1) UNIQUE SIGNATURES))
+  (pretty-print `(XTRACTED ,(length gen2-calls) GEN-2 CALLS, ,(length ug2) UNIQUE SIGNATURES))
+  (pretty-print `(XTRACTED ,(length gen3-calls) GEN-3 CALLS, ,(length ug3) UNIQUE SIGNATURES))
 )
+
+;; for drc.ppf we get (after 11s):
+;; (XTRACTED 118 GEN-1 CALLS, 19 UNIQUE SIGNATURES)
+;; (XTRACTED 4495 GEN-2 CALLS, 61 UNIQUE SIGNATURES)
+;; (XTRACTED 172725 GEN-3 CALLS, 193 UNIQUE SIGNATURES)
+;; so it might actually work :o
+
