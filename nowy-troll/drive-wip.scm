@@ -1,5 +1,7 @@
 (use-modules (grand scheme))
 
+(define (member? x xs) (and (member x xs) #t)) ;; :)
+
 (define (lookup key #;in binding)
   (match binding
     (() #f)
@@ -230,3 +232,220 @@
               ELSE FAIL!)))
 
 ;;; sooo this might actually work!!!! (tbc)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; hmmm
+
+(define (leaves tree)
+  (match tree
+    (('IF _ t* 'ELSE t**) `(,@(leaves t*) ,@(leaves t**)))
+    (('LEAF l) `(,l))
+    ('FAIL! '())))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; massive copy'n'paste from old ,,compiler''
+
+(define (applications-in expression)
+  (define (applications-in-qq qq)
+    (match qq
+      (('unquote e) (applications-in e))
+      ((e . e*) (append (applications-in-qq e) (applications-in-qq e*)))
+      (_ '())))
+  (match expression
+    (() '())
+    ('T '())
+    ((? symbol?) '())
+    ((? number?) '())
+    (('quote _) '())
+    (('quasiquote qq) (applications-in-qq qq))
+    (('+ e e*) (append (applications-in e) (applications-in e*)))
+    (('- e e*) (append (applications-in e) (applications-in e*)))
+    (('* e e*) (append (applications-in e) (applications-in e*)))
+    (('& e) (append (applications-in-qq e) `(,expression)))))
+
+(e.g. (applications-in '`(,x . ,(& (APD ,xs ,ys))))
+      ===> ( (& (APD (unquote xs) (unquote ys))) ))
+
+(e.g. (applications-in '(& (PLUS ,(& (VAL ,a)) ,(& (VAL ,b)))))
+      ===> ( (& (VAL ,a))
+             (& (VAL ,b))
+             (& (PLUS ,(& (VAL ,a)) ,(& (VAL ,b)))) ))
+
+(define (application->vars-map #;for expression)
+  (let ((applications (applications-in expression)))
+    (map (lambda (app index) `(,app . (V ,index)))
+         applications (iota (length applications)))))
+
+(e.g. (application->vars-map '(& (PLUS ,(& (VALUE ,a)) ,(& (VALUE ,b)))))
+      ===>( ((& (VALUE ,a)) . (V 0))
+            ((& (VALUE ,b)) . (V 1))
+            ((& (PLUS ,(& (VALUE ,a)) ,(& (VALUE ,b)))) . (V 2)) ))
+
+(define (cons<-quasiquote qq #;for-subexpressions-using comp-sub)
+  (match qq
+    (() '())
+    (('unquote e) (comp-sub e))
+    ((q . q*) `(CONS ,(cons<-quasiquote q comp-sub)
+                     ,(cons<-quasiquote q* comp-sub)))
+    (e `(quote ,e))))
+;;; that comp-sub thing is a bit of afterthought for now but the point
+;;; is to be able to compile unquoted expressions with whomever called
+;;; cons<-quasiquote (it should get inside compiled-subexpression...).
+
+(e.g. (cons<-quasiquote '(+ ,x ,y) (lambda (x) x)) ;; just trivial comp-sub
+      ===> (CONS '+ (CONS x (CONS y ()))))
+(e.g. (cons<-quasiquote '(a (b ,c) d) (lambda (x) x))
+      ===> (CONS 'a (CONS (CONS 'b (CONS c ())) (CONS 'd ()))))
+
+(define (compiled-subexpression expr #;wrt vars-for-apps)
+  (let cmpld ((expr expr))
+    (match expr
+      (() '())
+      ('T 'T)
+      ((? symbol? sym) sym)
+      ((? number? num) num)
+      (('quote e) expr)
+      (('quasiquote qq) (cons<-quasiquote qq cmpld))
+      (('+ e e*) `(+ ,(cmpld e) ,(cmpld e*)))
+      (('- e e*) `(- ,(cmpld e) ,(cmpld e*)))
+      (('* e e*) `(* ,(cmpld e) ,(cmpld e*)))
+      (('& e) (lookup expr vars-for-apps))
+      #;err??)))
+
+(e.g. (compiled-subexpression '`(hi there (+ ,x ,y)) '())
+      ===> (CONS 'hi
+                 (CONS 'there
+                       (CONS (CONS '+ (CONS x (CONS y ())))
+                             ()))))
+
+(e.g. (let* ((expression '(+ (& (VAL ,a)) (& (VAL ,b))))
+             (vars4apps (application->vars-map expression)))
+        (compiled-subexpression expression vars4apps))
+      ===> (+ (V 0) (V 1)))
+
+(e.g. (let* ((expression '`(,x . ,(& (APD ,xs ,ys))))
+             (vars4apps (application->vars-map expression)))
+        (compiled-subexpression expression vars4apps))
+      ===> (CONS x (V 0)))
+
+(define (compiled-expression expression)
+  (let* ((vars4apps (application->vars-map expression))
+         (apps-code
+          (map (lambda (((& e) . var))
+                 `((LET *VIEW*
+                        ,(compiled-subexpression `(,'quasiquote ,e)
+                                                 vars4apps))
+                   (LET ,var
+                        (CALL 0 *VIEW*))))
+               vars4apps))
+         (ret-code
+          `((RETURN ,(compiled-subexpression expression
+                                             vars4apps))))
+         (compilate (fold-right append ret-code apps-code)))
+    #;(match compilate 
+      ((code ...
+          ('LET v ('CALL lbl '*VIEW*))
+          ('RETURN v)) ;;; a tail-call! optimize! o/
+       `(,@code (GOTO ,lbl)))
+      (_ compilate))
+    compilate))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; now...
+
+(define (updated bnd s e)
+  (match bnd
+    (() `((,s . ,e)))
+    (((k . v) . bnd*) (if (equal? k s)
+                          `((,k . ,e) . ,bnd*)
+                          `((,k . ,v) . ,(updated bnd* s e))))))
+
+(define (inlinexp exp bnd)
+  (match exp
+    (('CONS h t) `(CONS ,(inlinexp h bnd) ,(inlinexp t bnd)))
+    (('+ h t) `(+ ,(inlinexp h bnd) ,(inlinexp t bnd)))
+    (('* h t) `(* ,(inlinexp h bnd) ,(inlinexp t bnd)))
+    (('- h t) `(- ,(inlinexp h bnd) ,(inlinexp t bnd)))
+    (() '())
+    ('T 'T)
+    ((? number? n) n)
+    (('quote _) exp)
+    (('CALL 0 e) `(CALL 0 ,(inlinexp e bnd)))
+    (v (match (lookup v bnd)
+         (#f v)
+         (e e)))))
+    
+(define (inline-lets code)
+  (let loop ((code code)
+             (bnd '()))
+    (match code
+      (() '())
+      ((('LET v e) . code*) (loop code* (updated bnd
+                                                 v
+                                                 (inlinexp e bnd))))
+      ((('RETURN e)) (inlinexp e bnd) #;`((RETURN ,(inlinexp e bnd))))
+      #;((('GOTO _)) code))))
+
+
+(define (massaged-leaf leaf)
+  (let* ((('BINDING bindings 'BODY body) leaf)
+         (code `(,@(map (lambda ((s . v)) `(LET ,s ,v)) bindings)
+                 ,@(compiled-expression body))))
+    #;code
+    (inline-lets code)))
+
+(e.g.
+ (massaged-leaf [cadr (mk-tree (clauses->rM p1)
+                               (qq->cons '(APD (q w e) ,bs)))])
+ ===> (CONS 'q
+            (CALL 0 (CONS 'APD
+                          (CONS (CONS 'w
+                                      (CONS 'e ()))
+                                (CONS bs ())))))
+     #;((LET ys bs)
+        (LET xs (CONS 'w (CONS 'e ())))
+        (LET x 'q)
+        (LET *VIEW* (CONS 'APD (CONS xs (CONS ys ()))))
+        (LET (V 0) (CALL 0 *VIEW*))
+        (RETURN (CONS x (V 0)))))
+
+(e.g. (massaged-leaf '(BINDING () BODY (& (APD ,xs ,(& (APD ,ys ,zs)))))) 
+      ===> 
+      (CALL 0
+            (CONS 'APD
+                  (CONS xs
+                        (CONS (CALL 0
+                                    (CONS 'APD
+                                          (CONS ys
+                                                (CONS zs
+                                                      ()))))
+                              ()))))
+         #;((LET *VIEW* (CONS 'APD (CONS ys (CONS zs ()))))
+            (LET (V 0) (CALL (0) *VIEW*))
+            (LET *VIEW* (CONS 'APD (CONS xs (CONS (V 0) ()))))
+            (GOTO 0)))
+
+(define (xtracted-callz mleaf)
+  (match mleaf
+    (('CALL 0 e) `((,e) . ,(xtracted-callz e)))
+    (('CONS h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))
+    (('+ h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))   
+    (('- h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))
+    (('* h t) `(,@(xtracted-callz h) ,@(xtracted-callz t)))
+    (_ '())))
+
+(e.g. (xtracted-callz
+       (massaged-leaf '(BINDING ()
+                        BODY (+ (& (MUL ,n ,m))
+                                (& (REM ,n ,m))))))
+      ===> (((CONS 'MUL (CONS n (CONS m ()))))
+            ((CONS 'REM (CONS n (CONS m ()))))))
+
+(let* ((prog (with-input-from-file "drc.ppf" read) #;p1)
+       (tree0 (mk-tree (clauses->rM prog) '*))
+       (lvs0 (leaves tree0))
+       (lvs0* (map massaged-leaf lvs0))
+       (gen1-calls (apply append (map xtracted-callz lvs0*))))
+  (map (lambda (c) (write c) (newline) 23) gen1-calls)
+  (pretty-print `(XTRACTED ,(length gen1-calls) GEN-1 CALLS))
+)
