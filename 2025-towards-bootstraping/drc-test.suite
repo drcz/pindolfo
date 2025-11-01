@@ -1,0 +1,5 @@
+(dbl-apd-test (M A) (K U L A) (T U R A)) | (M A K U L A T U R A)
+(dbl-apd-test (P R O) (K U R A) (T U R A)) | (P R O K U R A T U R A)
+(dbl-apd-test () (K U R A) (T U R A)) | (K U R A T U R A)
+(dbl-apd-test (K U R A) () (T U R A)) | (K U R A T U R A)
+(dbl-apd-test (K U R A) (T U R A) ()) | (K U R A T U R A)

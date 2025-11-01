@@ -1,0 +1,8 @@
+(apd (q w e) (a s d)) | (q w e a s d)
+(apd () (a s d)) | (a s d)
+(apd (q w e) ()) | (q w e)
+(map dbl (1 2 3)) | (2 4 6)
+(map dbl ()) | ()
+(map dup (- 0 ^)) | ((- . -) (0 . 0) (^ . ^))
+(rev (dercz likes pindolfo)) | (pindolfo likes dercz)
+(rev ()) | ()

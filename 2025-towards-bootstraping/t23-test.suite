@@ -1,0 +1,2 @@
+(test) | (p n d l f p n d l f)
+(test2) | (>> (p n d l f) <<)
