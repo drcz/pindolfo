@@ -4,7 +4,8 @@
 ##  NA PRZYPALE ALBO WCALE  ##
 ##############################
 
-COMPILER = "../pindolfo2scm-0.scm"
+#COMPILER = "../pindolfo2scm-0.scm"
+COMPILER = "../pindolfo2scm-1.scm"
 
 TESTS = [
   ["classics-0.ppf", "classics-0-test.suite"],
