@@ -1,6 +1,6 @@
-;;; this is pindolfo->scm compiler number zero (prototype collage)
-;;; -- i.e. a weakest possible one which doesn't optimise anything
-;;; but sets up framework for the next one.
+;;; this is pindolfo->scm compiler number ONE (ugly WIP prototype)
+;;; it drives one level deep into the process graph.
+;;; also, doesn't work on drc.ppf yet (some tricky magic)
 (use-modules (grand scheme))
 
 (define (lookup key #;in binding)
@@ -24,8 +24,6 @@
 
 (define (binop? x) (member? x '(+ * -)))
 
-(define DISPATCH-VARNAME 'v0)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; first we turn the source program [a list of (pattern action) clauses]
 ;; into blueprint from which the target program will be built:
@@ -33,7 +31,7 @@
 ;; i.e. triplet (<identifier> <bindings (var . addr)> <action's body>)
 
 (define (clause->blueclause (pattern action) clause-id)
-  (let walk ((todo `((,pattern ,DISPATCH-VARNAME)))
+  (let walk ((todo `((,pattern *)))
              (reqs '())
              (binding '()))
     (match todo
@@ -57,7 +55,7 @@
                              ('exp #f)))
                       (reqs* (if req `(,@reqs ,req) reqs)))
                  (walk todo* reqs* binding*)))
-         (addr* (walk todo* `(,@reqs (,addr . (EQ? ,addr*))) binding))))
+           (addr* (walk todo* `(,@reqs (,addr . (EQa? ,addr*))) binding))))
       ((((pat . pat*) addr) . todo*)
        (let* ((todo** `((,pat (car ,addr)) (,pat* (cdr ,addr)) . ,todo*))
               (reqs* `(,@reqs (,addr . (CONS?)))))
@@ -97,7 +95,7 @@
 
 (define (cons<-quasiquote qq #;for-subexpressions-using comp-sub)
   (match qq
-    (() ''())
+    (() ''()) ;; !!
     (('unquote e) (comp-sub e))
     ((q . q*) `(cons ,(cons<-quasiquote q comp-sub)
                      ,(cons<-quasiquote q* comp-sub)))
@@ -106,7 +104,7 @@
 (define (compiled-expression expr #;wrt apps2vars)
   (let cmpld ((expr expr))
     (match expr
-      (() ''())
+      (() ''()) ;; !!
       ('T ''T)
       ((? var? v) (sym+sym 'v- v))
       ((? number? num) num)
@@ -126,7 +124,6 @@
          (compilate (if (null? apps-code)
                         ret-code
                         `(let* ,apps-code ,ret-code))))
-    ;;; TODO: bring back the TCO! (cf LEAF23 example below)
     compilate))
 
 (define (compiled-leaf (clause-id binding action))
@@ -142,7 +139,7 @@
       (define (LEAF23 v-x v-y)
         (let* ((a-0 (DISPATCH (cons 'APD (cons v-x (cons v-y '())))))
                (a-1 (DISPATCH (cons 'APD (cons a-0 (cons v-x '()))))))
-          a-1))) ;;; <- see? the 2nd app of DISPATCH could be outside
+          a-1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ...and now we use the blueprint to generate DISPATCH procedure,
@@ -216,26 +213,34 @@
     (() #t)
     ((? number?) #t)
     (('quote _) #t)
-    (('car e) (ground? e)) ;; as of now it should always be #f, no?
-    (('cdr e) (ground? e)) ;; - || -
-    (('cons h t) (and (ground? h) (ground? t)))))
+    ((_ e) (ground? e))
+    ((_ e e*) (and (ground? e) (ground? e*)))))
 
 (define (reduce-req req mexpr)
   (let* (((addr . cnd) req)
-         (addr/cnstr (expr-for addr mexpr)))
-    (if (not (ground? addr/cnstr))
-        (match `(,cnd ,addr/cnstr)
-          ((('CONS?) ('cons _ _)) #t) ;; TODO is that even possible?
-          (_ `(,addr/cnstr . ,cnd))) ;; <- it can't decide now
-        (match `(,cnd ,addr/cnstr)
-          ((('CONS?) ('cons _ _)) #t)
-          ((('NIL?) ()) #t)
-          ((('NUM?) (? number?)) #t)
-          ((('SYM?) ('quote _)) #t)
-          ((('ATM?) ('cons _ _)) #f)
-          ((('ATM?) _) #t)
-          ((('EQ? e) e) #t) ;;; sure??
-          (_ #f)))))
+         (addr/cnstr (expr-for addr mexpr))
+         (RES
+          (if (or (not (ground? addr/cnstr))
+                  (eq? (car cnd) 'EQa?)) ;;; LOL (for now)
+              (match `(,cnd ,addr/cnstr)
+                ((('CONS?) ('cons _ _)) #t) ;; TODO is that even possible?
+                ((('EQa? addr*) _) `(,addr/cnstr . (EQa? ,(expr-for addr* mexpr)))) ;; !!
+                (_ `(,addr/cnstr . ,cnd))) ;; <- it can't decide now
+              (match `(,cnd ,addr/cnstr)
+                ((('CONS?) ('cons _ _)) #t)
+                ((('NIL?) ()) #t)
+                ((('NIL?) ('quote ())) #t)          ;;; !!! tricky
+                ((('NUM?) ('quote (? number?))) #t) ;;; !!! stuff!
+                ((('NUM?) (? number?)) #t)
+                ((('SYM?) ('quote _)) #t)
+                ((('ATM?) ('cons _ _)) #f)
+                ((('ATM?) _) #t)
+                ((('EQ? e) e) #t)
+                ((('EQ? ('quote e)) e) #t) ;;; ??? ...just
+                ((('EQ? e) ('quote e)) #t) ;;; ??? checkin'
+                (_ #f)))))
+    ;[pretty-print `(RR ,req ,mexpr => ,RES)] ;; pretty-print-debugging ;)
+    RES))
 
 (define (mk-test cnd addr)
   (define (massage-addr a) a) ;; i guess we don't need it anymore?
@@ -244,7 +249,7 @@
     (('NIL? a) `(null? ,(massage-addr a)))
     (('EQ? (? number? n) a) `(equal? ,n ,(massage-addr a)))
     (('EQ? ('quote e) a) `(equal? (quote ,e) ,(massage-addr a)))
-    (('EQ? a a*) `(equal? ,(massage-addr a) ,(massage-addr a*)))
+    (('EQa? a a*) `(equal? ,(massage-addr a) ,(massage-addr a*)))
     (('NUM? a) `(number? ,(massage-addr a)))
     (('SYM? a) `(symbol? ,(massage-addr a)))
     (('ATM? a) `(not (pair? ,(massage-addr a))))))
@@ -275,24 +280,89 @@
             `(if ,test ,then-t ,else-t))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; now we want to project that main tree for each ,,application'' in
+;;; each leaf so that instead of DISPATCH0 they have their dedicated
+;;; subtree to walk. we don't project leaves, just the decission tree.
+
+(define (vars-in mexpr) ;; mexpr already in cons form
+  (match mexpr 
+    ((? var? v) `(,v))
+    (('quote _) '())
+    ((_ e) (vars-in e)) ;; car, cdr
+    ((_ h t) (union (vars-in h) (vars-in t))) ;;; cons, +, -, *, no?
+    (_ '())))
+
+[e.g. (vars-in (qq->cons '(APD ,xs ,ys))) ===> (ys xs)]
+
+;;; seen is (mexpr . def) alist where def is just scheme definition
+;;; of dispatch computed for mexpr so (define (disp-id . args) body)
+;;; this way we can keep track of all the ,,already computed'' (i.e.
+;;; _seen_) tree projections, and once they're all computed we can
+;;; extract the code trivially (map cdr seen) y'know...
+
+(define (mk-dispatch mexpr seen blueprint) ;; -> (call seen*)
+  (match (lookup mexpr seen) ;; TODO normalize mexpr?
+    (('define (disp-id . args) body) ;; already computed
+     `((,disp-id . ,args) seen))
+    (#f ;; fresh one, compute, add to seen and generate call:
+     (let* ((body (decission-tree blueprint mexpr))
+            (args (vars-in mexpr))
+            (disp-id (sym+num 'DISPATCH (length seen)))
+            (def `(define (,disp-id . ,args) ,body))
+            (seen* `(,@seen (,mexpr . ,def))))
+       `((,disp-id . ,args) ,seen*)))))
+
+;;; it's just a sketch no worries (no thinking => no overthinking \o/)
+(define (apps-from leaf-proc)
+  (match leaf-proc
+    (('define _ ('let* as body))
+     (delete-duplicates (map (lambda ((var app)) app) as)))
+    (('define _ _) '())))
+
+(define (substitute-apps-inside leaf-proc seen)
+  (match leaf-proc
+    (('define head ('let* as body))
+     (let* ((as* (map (lambda ((var ('DISPATCH mexpr)))
+                        (match (lookup mexpr seen)
+                          (('define (disp-id . args) body)
+                           `(,var (,disp-id . ,args)))
+                          (#f `(,var (DISPATCH ,mexpr)))))
+                      as)))
+       `(define ,head (let* ,as* ,body))))
+    (_ leaf-proc)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; so now we can put all the pieces in place:
 
 (define (compiled program)
   (let* ((blueprint (program->blueprint program))
-         (leaves (map last blueprint))
-         (leaf-procs (map compiled-leaf leaves))
-         (dispatch-proc `(define (DISPATCH ,DISPATCH-VARNAME)
-                           ,(decission-tree blueprint DISPATCH-VARNAME)))
          (fail-proc `(define (FAIL a)
                        (display `(NO MATCH FOUND FOR ,a))
                        (newline)
-                       (error "halt"))))
+                       (error "halt")))
+         ((init-call seen) (mk-dispatch 'v0 '() blueprint))
+         ;;; init-call is just (DISPATCH0 v0) so we ignore it for now
+         (leaves (map last blueprint)) ;; TODO filter reachable?
+         (leaf-procs0 (map compiled-leaf leaves))
+         (all-apps (apply union (map apps-from leaf-procs0)))
+         (seen* (let loop ((todo all-apps)
+                           (seen seen))
+                  (match todo
+                    (() seen)
+                    ((('DISPATCH mexpr) . todo*)
+                     (let* (((_ seen*) (mk-dispatch mexpr
+                                                    seen
+                                                    blueprint)))
+                       (loop todo* seen*))))))
+         (dispatch-procs (map cdr seen*))
+         (leaf-procs (map (lambda (lp) (substitute-apps-inside lp seen*))
+                           leaf-procs0)))
     `(,@leaf-procs
+      ,@dispatch-procs
       ,fail-proc
-      ,dispatch-proc
-      (begin (write (DISPATCH (read))) (newline)))))
+      (begin (write (DISPATCH0 (read))) (newline)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(display ";; pindolfo2scm v0.2") (newline)
+(display ";; pindolfo2scm v1.1") (newline)
 (map pretty-print (compiled (read)))
 (newline)

@@ -59,9 +59,10 @@ TESTS.each{|pndlf_fname, tests_fname|
   compilate_fname = pndlf_fname.gsub(".ppf",".scm")
   print "* compiling #{pndlf_fname}... "
   `guile #{COMPILER} < #{pndlf_fname} > #{compilate_fname} 2> /dev/null` # :)
-  `echo "aaa" | guile #{compilate_fname} 2>&1 > /dev/null` # XD
   if File.exist?(compilate_fname)
-    puts "ok"
+    print "ok, now guile compiles it... "
+    `echo "aaa" | guile #{compilate_fname} 2>&1 > /dev/null` # XD
+    puts "ok!"
   else
     puts "compile error!!!"
   end
