@@ -276,13 +276,15 @@
          (dispatch-proc `(define (DISPATCH ,DISPATCH-VARNAME)
                            ,(decission-tree blueprint)))
          (fail-proc `(define (FAIL a)
-                       (error "NO MATCH FOUND!" a))))
+                       (display `(NO MATCH FOUND FOR ,a))
+                       (newline)
+                       (error "halt"))))
     `(,@leaf-procs
       ,fail-proc
       ,dispatch-proc
       (begin (write (DISPATCH (read))) (newline)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(write ";; pindolfo2scm v0.1") (newline)
+(display ";; pindolfo2scm v0.1") (newline)
 (map pretty-print (compiled (read)))
 (newline)
