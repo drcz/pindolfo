@@ -106,7 +106,8 @@
 (define (compiled-expression expr #;wrt apps2vars)
   (let cmpld ((expr expr))
     (match expr
-      ;;(() ''()) ('T ''T)
+      (() ''())
+      ('T ''T)
       ((? var? v) (sym+sym 'v- v))
       ((? number? num) num)
       (('quote e) expr)
