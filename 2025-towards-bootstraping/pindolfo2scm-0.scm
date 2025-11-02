@@ -192,51 +192,6 @@
 (e.g. (qq->cons '(REV ,xs (,x . ,rs)))
       ===> (cons 'REV (cons xs (cons (cons x rs) '()))))
 
-(define (expr-for addr mexpr)
-  (match addr
-    ('* mexpr)
-    (('car addr*) (match (expr-for addr* mexpr)
-                    (('cons mexpr* _) mexpr*)
-                    (mexpr* `(car ,mexpr*))))
-    (('cdr addr*) (match (expr-for addr* mexpr)
-                    (('cons _ mexpr*) mexpr*)
-                    (mexpr* `(cdr ,mexpr*))))))
- 
-(e.g. (expr-for '(car *) '(cons x 'elo)) ===> x)
-(e.g. (expr-for '(cdr *) '(cons x 'elo)) ===> 'elo)
-(e.g. (expr-for '* '(cons x 'elo)) ===> (cons x 'elo))
-(e.g. (expr-for '(car (car *)) '(cons (cons 'elo 'yolo) y)) ===> 'elo)
-(e.g. (expr-for '(cdr (car *)) '(cons (cons 'elo 'yolo) y)) ===> 'yolo)
-(e.g. (expr-for '(cdr *) '(cons (cons 'elo 'yolo) y)) ===> y)
-(e.g. (expr-for '(car (cdr *)) '(cons (cons 'elo 'yolo) y)) ===> (car y))
-
-(define (ground? expr)
-  (match expr
-    ((? var?) #f)
-    (() #t)
-    ((? number?) #t)
-    (('quote _) #t)
-    (('car e) (ground? e)) ;; as of now it should always be #f, no?
-    (('cdr e) (ground? e)) ;; - || -
-    (('cons h t) (and (ground? h) (ground? t)))))
-
-(define (reduce-req req mexpr)
-  (let* (((addr . cnd) req)
-         (addr/cnstr (expr-for addr mexpr)))
-    (if (not (ground? addr/cnstr))
-        (match `(,cnd ,addr/cnstr)
-          ((('CONS?) ('cons _ _)) #t) ;; TODO is that even possible?
-          (_ `(,addr/cnstr . ,cnd))) ;; <- it can't decide now
-        (match `(,cnd ,addr/cnstr)
-          ((('CONS?) ('cons _ _)) #t)
-          ((('NIL?) ()) #t)
-          ((('NUM?) (? number?)) #t)
-          ((('SYM?) ('quote _)) #t)
-          ((('ATM?) ('cons _ _)) #f)
-          ((('ATM?) _) #t)
-          ((('EQ? e) e) #t) ;;; sure??
-          (_ #f)))))
-
 (define (mk-test cnd addr)
   (define (massage-addr a) a) ;; i guess we don't need it anymore?
   (match `(,@cnd ,addr)
