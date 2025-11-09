@@ -1,0 +1,54 @@
+(
+(('lookup _ ()) 'NOT-FOUND)
+(('lookup (exp key) (((exp key) (exp val)) . _)) `(FOUND ,val))
+(('lookup (exp key) (_ . (exp bnd))) (& (lookup ,key ,bnd)))
+
+;;; extracting requirements and bound variables from pattern take 1:
+
+(('bnd+reqs (exp pattern)) (& (bnd+reqs ((,pattern *)) () ())))
+
+(('bnd+reqs () (exp reqs) (exp bnd)) `(REQS: ,reqs BND: ,bnd))
+
+(('bnd+reqs (('_ (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ,reqs ,bnd)))
+
+(('bnd+reqs ((() (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr NIL?) . ,reqs) ,bnd)))
+
+(('bnd+reqs (((num n) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr EQ? ,n) . ,reqs) ,bnd)))
+
+(('bnd+reqs ((('quote (sym s)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr EQ? (quote ,s)) . ,reqs) ,bnd)))
+
+(('bnd+reqs ((('num (sym s)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs/var ,(& (lookup ,s ,bnd)) ,s num ,addr ,todo ,reqs ,bnd)))
+
+(('bnd+reqs ((('sym (sym s)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs/var ,(& (lookup ,s ,bnd)) ,s sym ,addr ,todo ,reqs ,bnd)))
+
+(('bnd+reqs ((('atm (sym s)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs/var ,(& (lookup ,s ,bnd)) ,s atm ,addr ,todo ,reqs ,bnd)))
+
+(('bnd+reqs ((('exp (sym s)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs/var ,(& (lookup ,s ,bnd)) ,s exp ,addr ,todo ,reqs ,bnd)))
+
+(('bnd+reqs/var 'NOT-FOUND (sym s) 'num (exp addr) (exp todo) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr NUM?) . ,reqs) ((,s ,addr) . ,bnd))))
+
+(('bnd+reqs/var 'NOT-FOUND (sym s) 'sym (exp addr) (exp todo) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr SYM?) . ,reqs) ((,s ,addr) . ,bnd))))
+
+(('bnd+reqs/var 'NOT-FOUND (sym s) 'atm (exp addr) (exp todo) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr ATM?) . ,reqs) ((,s ,addr) . ,bnd))))
+
+(('bnd+reqs/var 'NOT-FOUND (sym s) 'exp (exp addr) (exp todo) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ,reqs ((,s ,addr) . ,bnd))))
+
+(('bnd+reqs/var ('FOUND (exp addr*)) _ _ (exp addr) (exp todo) (exp reqs) (exp bnd))
+ (& (bnd+reqs ,todo ((,addr EQa? ,addr*) . ,reqs) ,bnd)))
+
+(('bnd+reqs ((((exp h) . (exp t)) (exp addr)) . (exp todo)) (exp reqs) (exp bnd))
+ (& (bnd+reqs ((,h (car ,addr)) (,t (cdr ,addr)) . ,todo) ((,addr CONS?) . ,reqs) ,bnd)))
+
+)

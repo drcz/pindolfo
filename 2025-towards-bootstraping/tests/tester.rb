@@ -13,7 +13,8 @@ TESTS = [
   ["t23.ppf", "t23-test.suite"],
   ["substring.ppf", "substring-test.suite"],
   ["drc.ppf", "drc-test.suite"],
-  ["lisp0.ppf", "lisp0-test.suite"]
+  ["lisp0.ppf", "lisp0-test.suite"],
+  ["bnd+reqs.ppf", "bnd+reqs-test.suite"]
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
@@ -43,7 +44,7 @@ def run_test(pndlf_fname, tests_fname)
         print "."
       else
         print "!"
-        err_msgs << "#{compilate_fname} error, for #{inp} expected #{exp} but got #{act}"
+        err_msgs << "#{compilate_fname} error, for #{inp}\n  expected #{exp}\n   but got #{act}"
       end
     }
     print (err_msgs.length==0 ? " ok!" : " ayy!") + "\n"
