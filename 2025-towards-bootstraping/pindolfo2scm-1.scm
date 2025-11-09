@@ -1,6 +1,5 @@
 ;;; this is pindolfo->scm compiler number ONE (ugly WIP prototype)
 ;;; it drives one level deep into the process graph.
-;;; also, doesn't work on drc.ppf yet (some tricky magic)
 (use-modules (grand scheme))
 
 (define (lookup key #;in binding)
@@ -17,6 +16,17 @@
 
 (e.g. (sym+num 'clause 23) ===> clause23)
 (e.g. (sym+sym 'var- 'x) ===> var-x)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define DEBUG-MODE #f)
+
+(define (dbg-massage-proc def) ;; co się kurwa paczysz?!
+  (match def
+    (('define (proc-name . args) body)
+     `(define (,proc-name . ,args)
+        (write (list (quote ,proc-name) . ,args)) (newline)
+        ,body))
+    (_ def)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define var? symbol?)
@@ -232,7 +242,7 @@
                 ((('NIL?) ('quote ())) #t)          ;;; !!! tricky
                 ((('NUM?) ('quote (? number?))) #t) ;;; !!! stuff!
                 ((('NUM?) (? number?)) #t)
-                ((('SYM?) ('quote _)) #t)
+                ((('SYM?) ('quote (? symbol?))) #t) ;;; !!!
                 ((('ATM?) ('cons _ _)) #f)
                 ((('ATM?) _) #t)
                 ((('EQ? e) e) #t)
@@ -241,6 +251,7 @@
                 (_ #f)))))
     ;[pretty-print `(RR ,req ,mexpr => ,RES)] ;; pretty-print-debugging ;)
     RES))
+
 
 (define (mk-test cnd addr)
   (define (massage-addr a) a) ;; i guess we don't need it anymore?
@@ -356,13 +367,16 @@
                        (loop todo* seen*))))))
          (dispatch-procs (map cdr seen*))
          (leaf-procs (map (lambda (lp) (substitute-apps-inside lp seen*))
-                           leaf-procs0)))
-    `(,@leaf-procs
-      ,@dispatch-procs
-      ,fail-proc
-      (begin (write (DISPATCH0 (read))) (newline)))))
+                           leaf-procs0))
+         (target-src `(,@leaf-procs
+                       ,@dispatch-procs
+                       ,fail-proc
+                       (begin (write (DISPATCH0 (read))) (newline)))))
+    (if DEBUG-MODE
+        (map dbg-massage-proc target-src)
+        target-src)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(display ";; pindolfo2scm v1.1") (newline)
+(display ";; pindolfo2scm v1.2") (newline)
 (map pretty-print (compiled (read)))
 (newline)
