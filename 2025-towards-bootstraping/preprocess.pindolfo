@@ -1,0 +1,29 @@
+(;(this one removes the decorating => and inlines all the let-like expressions.
+   believe it or not, it is capable of processing itself, and that is something!)
+
+ (('unLETized ?code) => ^(map unLET ,code))
+
+ (('unLET (?pattern '=> . ?actions)) => ^(unLET (,pattern . ,actions)))
+ (('unLET (?pattern     . ?actions)) => `(,pattern ,^(unLETact ,actions ())))
+
+ (('unLETact ($var '<- ?exp . ?todo) ?bnd) => bb <- `(,var ,^(SUB ,bnd in ,exp))
+                                              bnd* <- `(,bb . ,bnd)
+                                              ^(unLETact ,todo ,bnd*))
+ (('unLETact (?exp) ?bnd) => ^(SUB ,bnd in ,exp))
+ ;-------------------------------------------------------------------
+ (('SUB ?bnd 'in $sym            ) => ^(LU/id ,sym ,bnd))
+ (('SUB ?bnd 'in ('quasiquote ?e)) => `(quasiquote ,^(SUB-qq ,bnd in ,e)))
+ (('SUB ?bnd 'in ('rec ?e)       ) => `(rec ,^(SUB-qq ,bnd in ,e)))
+ (('SUB ?bnd 'in ?e              ) => e)
+
+ (('SUB-qq ?bnd 'in ('unquote ?e)) => `(,'unquote ,^(SUB ,bnd in ,e))) ;(nb unquote the unquote to quote it!)
+ (('SUB-qq ?bnd 'in (?h . ?t)    ) => `(,^(SUB-qq ,bnd in ,h) . ,^(SUB-qq ,bnd in ,t)))
+ (('SUB-qq ?bnd 'in ?e           ) => e)
+ ;-------------------------------------------------------------------
+ (('map ?proc ()        ) => ())
+ (('map ?proc (?x . ?xs)) => `(,^(,proc ,x) . ,^(map ,proc ,xs)))
+
+ (('LU/id $sym ()               ) => sym)
+ (('LU/id $sym (($sym ?val) . _)) => val)
+ (('LU/id $sym (_ . ?bnd)       ) => ^(LU/id ,sym ,bnd))
+)
