@@ -1,18 +1,18 @@
 (
      (('fold-r (exp op) (exp e) ()) e)
      (('fold-r (exp op) (exp e) ((exp x) . (exp xs)))
-      (& (,op ,x ,(& (fold-r ,op ,e ,xs)))))
+      (rec (,op ,x ,(rec (fold-r ,op ,e ,xs)))))
 
      (('cons (exp h) (exp t)) `(,h . ,t))
-     (('apd (exp xs) (exp ys)) (& (fold-r cons ,ys ,xs)))
+     (('apd (exp xs) (exp ys)) (rec (fold-r cons ,ys ,xs)))
 
-     ((('cons*f.hd (exp f)) (exp h) (exp t)) (& (cons ,(& (,f ,h)) ,t)))
-     (('map (exp f) (exp xs)) (& (fold-r (cons*f.hd ,f) () ,xs)))
+     ((('cons*f.hd (exp f)) (exp h) (exp t)) (rec (cons ,(rec (,f ,h)) ,t)))
+     (('map (exp f) (exp xs)) (rec (fold-r (cons*f.hd ,f) () ,xs)))
      
      (('dup (exp x)) `(,x . ,x))
      (('dbl (num n)) (+ n n))
      
-     (('rev (exp xs)) (& (rev ,xs ())))
+     (('rev (exp xs)) (rec (rev ,xs ())))
      (('rev () (exp rs)) rs)
-     (('rev ((exp x) . (exp xs)) (exp rs)) (& (rev ,xs (,x . ,rs))))
+     (('rev ((exp x) . (exp xs)) (exp rs)) (rec (rev ,xs (,x . ,rs))))
 )

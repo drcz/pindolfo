@@ -13,7 +13,7 @@ typedef enum { T_NUM, T_SYM,
                T_LPAR, T_RPAR, T_DOT,
                T_QUOTE, T_QUASIQUOTE, T_UNQUOTE,
                T_SYM_A, T_NUM_A, T_ATM_A, T_EXP_A,
-               T_UP,
+               T_REC,
                T_EOF } TOKtype;
 
 struct {  TOKtype type;
@@ -28,7 +28,7 @@ void get_token() {
     case '\'': cur_token.type = T_QUOTE; return;
     case '`': cur_token.type = T_QUASIQUOTE; return;
     case ',': cur_token.type = T_UNQUOTE; return;
-    case '^': cur_token.type = T_UP; return;
+    case '^': cur_token.type = T_REC; return;
     case '@': cur_token.type = T_ATM_A; return;
     case '$': cur_token.type = T_SYM_A; return;
     case '%': cur_token.type = T_NUM_A; return;
@@ -58,7 +58,7 @@ SE *head_for(TOKtype t) {
     case T_NUM_A: return mk_sym("num");
     case T_ATM_A: return mk_sym("atm");
     case T_EXP_A: return mk_sym("exp");
-    case T_UP: return mk_sym("up");
+    case T_REC: return mk_sym("rec");
     }
     assert(0==1); /* notreached */
 }
@@ -74,9 +74,9 @@ SE *get_SE() {
     case T_LPAR: get_token(); return get_cdr();
     case T_QUOTE: case T_QUASIQUOTE: case T_UNQUOTE:
     case T_SYM_A: case T_NUM_A: case T_ATM_A: case T_EXP_A:
-    case T_UP: h = head_for(cur_token.type);
+    case T_REC: h = head_for(cur_token.type);
                 get_token();
-                /* TODO: checking for SYM after type annotators?? */
+                /* TODO checking for SYM after type annotators?? -> naah */
                 return mk_cons(h, mk_cons(get_SE(), NIL));
     }
     assert(0==1); /* notreached */

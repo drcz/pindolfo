@@ -1,7 +1,7 @@
 (
     (('apd () (exp ys)) ys)
-    (('apd ((sym x) . (exp xs)) (exp ys)) `(,x . ,(& (apd ,xs ,ys))))
+    (('apd ((sym x) . (exp xs)) (exp ys)) `(,x . ,(rec (apd ,xs ,ys))))
     (('gen-xs) `(p n d l f))
-    (('test) (& (apd ,(& (gen-xs)) ,(& (gen-xs)))))
-    (('test2) `(>> ,(& (gen-xs)) <<))
+    (('test) (rec (apd ,(rec (gen-xs)) ,(rec (gen-xs)))))
+    (('test2) `(>> ,(rec (gen-xs)) <<))
 )

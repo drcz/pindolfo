@@ -1,12 +1,12 @@
 (
  (('APD () (exp ys)) ys)
- (('APD ((exp x) . (exp xs)) (exp ys)) `(,x . ,(& (APD ,xs ,ys))))
+ (('APD ((exp x) . (exp xs)) (exp ys)) `(,x . ,(rec (APD ,xs ,ys))))
 
  (('MUL 0 _) 0)
  (('MUL 1 (num x)) x)
- (('MUL (num x) (num y)) (+ y (& (MUL ,(- x 1) ,y))))
+ (('MUL (num x) (num y)) (+ y (rec (MUL ,(- x 1) ,y))))
 
- (('REV (exp xs)) (& (REV ,xs ())))
+ (('REV (exp xs)) (rec (REV ,xs ())))
  (('REV () (exp rs)) rs)
- (('REV ((exp x) . (exp xs)) (exp rs)) (& (REV ,xs (,x . ,rs))))
+ (('REV ((exp x) . (exp xs)) (exp rs)) (rec (REV ,xs (,x . ,rs))))
 )

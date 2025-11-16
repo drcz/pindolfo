@@ -96,7 +96,7 @@
     (('quote _) '())
     (('quasiquote qq) (apps-in-qq qq))
     (((? binop?) e e*) `(,@(apps-in e) ,@(apps-in e*)))
-    (('& e) `(,@(apps-in-qq e) ,action))))
+    (('rec e) `(,@(apps-in-qq e) ,action))))
 
 (define (apps2vars-map #;for action)
   (let ((apps (apps-in action)))
@@ -121,12 +121,12 @@
       (('quote e) expr)
       (('quasiquote qq) (cons<-quasiquote qq cmpld))
       (((? binop? o) e e*) `(,o ,(cmpld e) ,(cmpld e*)))
-      (('& e) (lookup expr apps2vars)))))
+      (('rec e) (lookup expr apps2vars)))))
 
 (define (compiled-action action)
   (let* ((apps2vars (apps2vars-map action))
          (apps-code
-          (map (lambda (((& e) . var))
+          (map (lambda ((('rec e) . var))
                  `(,var (DISPATCH ,(compiled-expression
                                     `(,'quasiquote ,e) apps2vars))))
                apps2vars))
@@ -144,7 +144,7 @@
 
 (e.g. (compiled-leaf '(23
                        ((x . aaa) (y . bbb))
-                       (& (APD ,(& (APD ,x ,y)) ,x))))
+                       (rec (APD ,(rec (APD ,x ,y)) ,x))))
       ===>
       (define (LEAF23 v-x v-y)
         (let* ((a-0 (DISPATCH (cons 'APD (cons v-x (cons v-y '())))))
