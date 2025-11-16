@@ -1,4 +1,5 @@
-(
+(;(- naive matcher from Gluck&Klimov 2005 -)
+
  (('SUBSTRING ?a ?b) ^(SUB ,a ,b ,a ,b))
 
  (('SUB     ()     ?b ?oryg-a ?oryg-b) 'FOUND!)

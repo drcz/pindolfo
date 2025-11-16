@@ -1,4 +1,4 @@
-(
+( ;(- testing some higher order fun stuff (fur for sure!) -)
      (('fold-r ?op ?e ()) e)
      (('fold-r ?op ?e (?x . ?xs))
       ^(,op ,x ,(rec (fold-r ,op ,e ,xs))))

@@ -1,4 +1,4 @@
-(
+(;(a piece of history, the very first pindolfo script)
  (('APD () ?ys) ys)
  (('APD (?x . ?xs) ?ys) `(,x . ,^(APD ,xs ,ys)))
 

@@ -1,4 +1,4 @@
-(
+( ;(i have no idea what that was but apparently tested something)
     (('apd () ?ys) ys)
     (('apd ($x . ?xs) ?ys) `(,x . ,^(apd ,xs ,ys)))
     (('gen-xs) `(p n d l f))

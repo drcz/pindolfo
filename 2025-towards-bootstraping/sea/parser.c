@@ -13,7 +13,7 @@ typedef enum { T_NUM, T_SYM,
                T_LPAR, T_RPAR, T_DOT,
                T_QUOTE, T_QUASIQUOTE, T_UNQUOTE,
                T_SYM_A, T_NUM_A, T_ATM_A, T_EXP_A,
-               T_REC,
+               T_REC, T_COMMENT,
                T_EOF } TOKtype;
 
 struct {  TOKtype type;
@@ -29,6 +29,7 @@ void get_token() {
     case '`': cur_token.type = T_QUASIQUOTE; return;
     case ',': cur_token.type = T_UNQUOTE; return;
     case '^': cur_token.type = T_REC; return;
+    case ';': cur_token.type = T_COMMENT; return;
     case '@': cur_token.type = T_ATM_A; return;
     case '$': cur_token.type = T_SYM_A; return;
     case '%': cur_token.type = T_NUM_A; return;
@@ -78,6 +79,8 @@ SE *get_SE() {
                 get_token();
                 /* TODO checking for SYM after type annotators?? -> naah */
                 return mk_cons(h, mk_cons(get_SE(), NIL));
+    case T_COMMENT: get_token(); h = get_SE(); /* commented expr, ignore */
+                    get_token(); return get_SE();
     }
     assert(0==1); /* notreached */
 }
