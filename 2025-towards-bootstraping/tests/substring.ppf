@@ -1,14 +1,14 @@
 (
- (('SUBSTRING (exp a) (exp b)) (rec (SUB ,a ,b ,a ,b)))
+ (('SUBSTRING ?a ?b) ^(SUB ,a ,b ,a ,b))
 
- (('SUB () (exp b) (exp oryg-a) (exp oryg-b)) 'FOUND!)
- (('SUB ((sym e) . (exp a*)) (exp b) (exp oryg-a) (exp oryg-b)) (rec (TRY ,e ,a* ,b ,oryg-a ,oryg-b)))
+ (('SUB     ()     ?b ?oryg-a ?oryg-b) 'FOUND!)
+ (('SUB ($e . ?a*) ?b ?oryg-a ?oryg-b) ^(TRY ,e ,a* ,b ,oryg-a ,oryg-b))
 
- (('TRY (sym e) (exp a) () (exp oryg-a) (exp oryg-b)) 'NOT-FOUND!)
- (('TRY (sym e) (exp a) ((sym e) . (exp b)) (exp oryg-a) (exp oryg-b)) (rec (SUB ,a ,b ,oryg-a ,oryg-b)))
- (('TRY (sym e) (exp a) (_ . (exp b)) (exp oryg-a) (exp oryg-b)) (rec (NEXT ,oryg-a ,oryg-b)))
+ (('TRY $e ?a     ()    ?oryg-a ?oryg-b) 'NOT-FOUND!)
+ (('TRY $e ?a ($e . ?b) ?oryg-a ?oryg-b) ^(SUB ,a ,b ,oryg-a ,oryg-b))
+ (('TRY $e ?a ( _ . ?b) ?oryg-a ?oryg-b) ^(NEXT ,oryg-a ,oryg-b))
 
- (('NEXT (exp a) (_ . (exp b))) (rec (SUB ,a ,b ,a ,b)))
- (('NEXT (exp a)      ()      ) 'NOT-FOUND!)
+ (('NEXT ?a (_ . ?b)) ^(SUB ,a ,b ,a ,b))
+ (('NEXT  _    ()   ) 'NOT-FOUND!)
 )
 

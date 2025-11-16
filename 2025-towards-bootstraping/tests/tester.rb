@@ -4,8 +4,9 @@
 ##  NA PRZYPALE ALBO WCALE  ##
 ##############################
 
-#COMPILER = "../pindolfo2scm-0.scm"
-COMPILER = "../pindolfo2scm-1.scm"
+#COMPILER = "guile ../pindolfo2scm-0.scm"
+COMPILER = "guile ../pindolfo2scm-1.scm"
+DESUGAR = "../desugar"
 
 TESTS = [
   ["classics-0.ppf", "classics-0-test.suite"],
@@ -59,7 +60,7 @@ puts "welcome to the cool side of the pillow."
 TESTS.each{|pndlf_fname, tests_fname|
   compilate_fname = pndlf_fname.gsub(".ppf",".scm")
   print "* compiling #{pndlf_fname}... "
-  `guile #{COMPILER} < #{pndlf_fname} > #{compilate_fname} 2> /dev/null` # :)
+  `#{DESUGAR} < #{pndlf_fname} | #{COMPILER} > #{compilate_fname} 2> /dev/null` # :)
   if File.exist?(compilate_fname)
     print "ok, now guile compiles it... "
     `echo "aaa" | guile #{compilate_fname} 2>&1 > /dev/null` # XD

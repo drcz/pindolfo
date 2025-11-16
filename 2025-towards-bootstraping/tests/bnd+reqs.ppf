@@ -3,8 +3,6 @@
 (('lookup (exp key) (((exp key) (exp val)) . _)) `(FOUND ,val))
 (('lookup (exp key) (_ . (exp bnd))) (rec (lookup ,key ,bnd)))
 
-;;; extracting requirements and bound variables from pattern take 1:
-
 (('bnd+reqs (exp pattern)) (rec (bnd+reqs ((,pattern *)) () ())))
 
 (('bnd+reqs () (exp reqs) (exp bnd)) `(REQS: ,reqs BND: ,bnd))
