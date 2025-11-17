@@ -11,7 +11,8 @@ TESTS = [
   ["substring.pindolfo", "substring-test.suite"],
   ["drc.pindolfo", "drc-test.suite"],
   ["lisp0.pindolfo", "lisp0-test.suite"],
-  ["bnd+reqs.pindolfo", "bnd+reqs-test.suite"]
+  ["PinP.pindolfo", "PinP-test.suite"],
+  ["bnd+reqs.pindolfo", "bnd+reqs-test.suite"],
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
