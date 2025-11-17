@@ -1,5 +1,4 @@
-(
-;(tiny (dynamically-scoped) lisp in pindolf...)
+(;(tiny (dynamically-scoped) lisp in pindolf...)
 
 (('apd ()         ?ys) => ys)
 (('apd (?x . ?xs) ?ys) => `(,x . ,^(apd ,xs ,ys)))
@@ -47,9 +46,7 @@
                                       ^(eval ,e ,env*))
 
 ;------------------------------------------------------------
-(('init-env ?self-evs) => ^(zip ,self-evs ,self-evs))
-
-(('run ?program) => self-evs <- '(T cons car cdr + - * eq? num? sym? atm?)
+(('run ?program) => self-evs <- `(T cons car cdr + - * eq? num? sym? atm?)
                     top-env <- ^(zip ,self-evs ,self-evs)
                      ^(run ,program ,top-env))
 

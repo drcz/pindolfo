@@ -10,7 +10,7 @@ TESTS = [
   ["t23.pindolfo", "t23-test.suite"],
   ["substring.pindolfo", "substring-test.suite"],
   ["drc.pindolfo", "drc-test.suite"],
-  ["lisp0.ppf", "lisp0-test.suite"],
+  ["lisp0.pindolfo", "lisp0-test.suite"],
   ["bnd+reqs.pindolfo", "bnd+reqs-test.suite"]
 ]
 
