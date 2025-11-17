@@ -40,9 +40,8 @@ void get_token() {
     default: do { cur_token.buffer[i++] = c; }
              while ( i<TOK_BUFFER_SIZE &&
                      (c = getc(stdin))!=EOF &&
-                      !isspace(c) &&
-                      c!='(' && c!=')' &&
-                      c!='\'' && c!='`' && c!=',' );
+                      !isspace(c) && c!='(' && c!=')'
+                      /*&& c!='\'' && c!='`' && c!=','*/ );
              ungetc(c, stdin);
              cur_token.buffer[i] = '\0';
              cur_token.type = isdigit(cur_token.buffer[0])? T_NUM : T_SYM;
@@ -79,7 +78,7 @@ SE *get_SE() {
                 get_token();
                 /* TODO checking for SYM after type annotators?? -> naah */
                 return mk_cons(h, mk_cons(get_SE(), NIL));
-    case T_COMMENT: get_token(); h = get_SE(); /* commented expr, ignore */
+    case T_COMMENT: get_token(); get_SE(); /* commented expr, ignore */
                     get_token(); return get_SE();
     }
     assert(0==1); /* notreached */
@@ -90,6 +89,8 @@ SE *get_cdr() {
     if(cur_token.type==T_RPAR) return NIL;
     car = get_SE();
     get_token();
+    if(cur_token.type==T_COMMENT) { get_token(); get_SE();
+                                    get_token(); } /* not elegant but... */
     if(cur_token.type==T_RPAR) return mk_cons(car,NIL);
     if(cur_token.type==T_DOT) {
         get_token();
