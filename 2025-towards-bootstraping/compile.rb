@@ -12,7 +12,7 @@ else
   target_fname = ARGV[1]
 
   print "desugaring phase..."
-  src_light = `./desugar < #{source_fname}`
+  src_light = `#{__dir__}/desugar < #{source_fname}`
   puts "ok" # TODO checks?
 
   print "preprocessing phase..."
@@ -21,7 +21,7 @@ else
   puts "ok" # TODO checks...
 
   print "aaand compilation proper..."
-  o = `cat #{tmp_fname} | guile preprocess.scm | guile pindolfo2scm-1.scm > #{target_fname}`
+  o = `cat #{tmp_fname} | guile #{__dir__}/preprocess.scm  | guile #{__dir__}/pindolfo2scm-1.scm > #{target_fname}`
   `rm #{tmp_fname}`
   if o.length < 1
     puts "ok!\nAuf wiedersehen!"

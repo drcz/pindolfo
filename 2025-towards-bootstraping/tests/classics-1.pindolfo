@@ -1,0 +1,17 @@
+( ;(- testing some higher order fun stuff (fur for sure!) -)
+     (('fold-r ?op ?e ()        ) => e)
+     (('fold-r ?op ?e (?x . ?xs)) => ^(,op ,x ,^(fold-r ,op ,e ,xs)))
+
+     (('cons ?h ?t) => `(,h . ,t))
+     (('apd ?xs ?ys) => ^(fold-r cons ,ys ,xs))
+
+     ((('cons*f.hd ?f) ?h ?t) => ^(cons ,(rec (,f ,h)) ,t))
+     (('map ?f ?xs) => ^(fold-r (cons*f.hd ,f) () ,xs))
+     
+     (('dup ?x) => `(,x . ,x))
+     (('dbl %n) => (+ n n))
+     
+     (('rev ?xs) => ^(rev ,xs ()))
+     (('rev ()         ?rs) => rs)
+     (('rev (?x . ?xs) ?rs) => ^(rev ,xs (,x . ,rs)))
+)

@@ -4,18 +4,14 @@
 ##  NA PRZYPALE ALBO WCALE  ##
 ##############################
 
-#COMPILER = "guile ../pindolfo2scm-0.scm"
-COMPILER = "guile ../pindolfo2scm-1.scm"
-DESUGAR = "../desugar"
-
 TESTS = [
-  ["classics-0.ppf", "classics-0-test.suite"],
-  ["classics-1.ppf", "classics-1-test.suite"],
-  ["t23.ppf", "t23-test.suite"],
-  ["substring.ppf", "substring-test.suite"],
-  ["drc.ppf", "drc-test.suite"],
+  ["classics-0.pindolfo", "classics-0-test.suite"],
+  ["classics-1.pindolfo", "classics-1-test.suite"],
+  ["t23.pindolfo", "t23-test.suite"],
+  ["substring.pindolfo", "substring-test.suite"],
+  ["drc.pindolfo", "drc-test.suite"],
   ["lisp0.ppf", "lisp0-test.suite"],
-  ["bnd+reqs.ppf", "bnd+reqs-test.suite"]
+  ["bnd+reqs.pindolfo", "bnd+reqs-test.suite"]
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
@@ -32,7 +28,7 @@ end
 def run_test(pndlf_fname, tests_fname)
   print "* testing #{pndlf_fname} via #{tests_fname} "
   err_msgs = []
-  compilate_fname = pndlf_fname.gsub(".ppf",".scm")
+  compilate_fname = pndlf_fname.gsub(".pindolfo",".scm")
   msg = ok_compilte(compilate_fname)
   if msg != "ok"
     err_msgs << msg 
@@ -58,9 +54,9 @@ puts "welcome to the cool side of the pillow."
 #####################################################################
 # compile them first pls
 TESTS.each{|pndlf_fname, tests_fname|
-  compilate_fname = pndlf_fname.gsub(".ppf",".scm")
+  compilate_fname = pndlf_fname.gsub(".pindolfo",".scm")
   print "* compiling #{pndlf_fname}... "
-  `#{DESUGAR} < #{pndlf_fname} | #{COMPILER} > #{compilate_fname} 2> /dev/null` # :)
+  `../compile.rb #{pndlf_fname} #{compilate_fname} 2> /dev/null` # he_he
   if File.exist?(compilate_fname)
     print "ok, now guile compiles it... "
     `echo "aaa" | guile #{compilate_fname} 2>&1 > /dev/null` # XD
@@ -93,7 +89,7 @@ end
 if DELETE_COMPILATES_AFTERWARDS
   puts "(deleting compilates)"
   TESTS.each{|pndlf_fname, tests_fname|
-    compilate_fname = pndlf_fname.gsub(".ppf",".scm")
+    compilate_fname = pndlf_fname.gsub(".pindolfo",".scm")
     `rm #{compilate_fname}`
   }
 end

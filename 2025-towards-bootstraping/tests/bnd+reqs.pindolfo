@@ -1,0 +1,64 @@
+(;(another take and an almost-useful script. it will be nicer -soon-)
+
+ (('lookup    _ ()                   ) => 'NOT-FOUND)
+ (('lookup ?key ((?key ?val) . _    )) => `(FOUND ,val))
+ (('lookup ?key (         _  . ?dict)) => ^(lookup ,key ,dict))
+
+
+ (('bnd+reqs ?pattern) => todo <- `((,pattern *))
+                          reqs <- ()
+                          bnd <- ()
+                          ^(bnd+reqs ,todo ,reqs ,bnd))
+
+ (('bnd+reqs () ?reqs ?bnd) => `(REQS: ,reqs BND: ,bnd))
+
+ (('bnd+reqs (('_ ?addr) . ?todo) ?reqs ?bnd) => ^(bnd+reqs ,todo ,reqs ,bnd))
+
+ (('bnd+reqs ((() ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr NIL?) . ,reqs)
+                                                 ^(bnd+reqs ,todo ,reqs* ,bnd))
+
+ (('bnd+reqs ((%n ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr EQ? ,n) . ,reqs)
+                                                 ^(bnd+reqs ,todo ,reqs* ,bnd))
+
+ (('bnd+reqs ((('quote $s) ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr EQ? (quote ,s)) . ,reqs)
+                                                          ^(bnd+reqs ,todo ,reqs* ,bnd))
+
+ (('bnd+reqs ((('num $s) ?addr) . ?todo) ?reqs ?bnd) => LU <- ^(lookup ,s ,bnd)
+                                                        req <- 'NUM? 
+                                                        ^(bnd+reqs/var ,LU ,s ,req ,addr 
+                                                                       ,todo ,reqs ,bnd))
+
+ (('bnd+reqs ((('sym $s) ?addr) . ?todo) ?reqs ?bnd) => LU <- ^(lookup ,s ,bnd)
+                                                        req <- 'SYM? 
+                                                        ^(bnd+reqs/var ,LU ,s ,req ,addr 
+                                                                       ,todo ,reqs ,bnd))
+
+ (('bnd+reqs ((('atm $s) ?addr) . ?todo) ?reqs ?bnd) => LU <- ^(lookup ,s ,bnd)
+                                                        req <- 'ATM? 
+                                                        ^(bnd+reqs/var ,LU ,s ,req ,addr 
+                                                                       ,todo ,reqs ,bnd))
+
+ (('bnd+reqs ((('exp $s) ?addr) . ?todo) ?reqs ?bnd) => LU <- ^(lookup ,s ,bnd)
+                                                        req <- '-no-req-
+                                                        ^(bnd+reqs/var ,LU ,s ,req ,addr 
+                                                                       ,todo ,reqs ,bnd))
+
+ (('bnd+reqs/var 'NOT-FOUND $s '-no-req- ?addr ?todo ?reqs ?bnd)
+  => bnd* <- `((,s ,addr) . ,bnd)
+     ^(bnd+reqs ,todo ,reqs ,bnd*))
+
+ (('bnd+reqs/var 'NOT-FOUND $s $REQ ?addr ?todo ?reqs ?bnd)
+  => bnd* <- `((,s ,addr) . ,bnd)
+     reqs* <- `((,addr ,REQ) . ,reqs)
+     ^(bnd+reqs ,todo ,reqs* ,bnd*))
+
+ (('bnd+reqs/var ('FOUND ?addr*) _ _ ?addr ?todo ?reqs ?bnd)
+ => reqs* <- `((,addr EQa? ,addr*) . ,reqs)
+    ^(bnd+reqs ,todo ,reqs* ,bnd))
+
+ (('bnd+reqs (((?h . ?t) ?addr) . ?todo) ?reqs ?bnd) => todo* <- `((,h (car ,addr))
+                                                                   (,t (cdr ,addr))
+                                                                   . ,todo)
+                                                        reqs* <- `((,addr CONS?) . ,reqs)
+                                                        ^(bnd+reqs ,todo* ,reqs* ,bnd))
+)
