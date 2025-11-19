@@ -1,15 +1,14 @@
-all: memtest desugar
+all: memtest toolbox
 
 memtest: se.c memtest.c
 	gcc -o memtest se.c memtest.c
 
-desugar: se.c parser.c desugar.c
-	gcc -o desugar se.c parser.c desugar.c
+toolbox: se.c parser.c toolbox.c
+	gcc -o toolbox se.c parser.c toolbox.c
 
 install:
-	cp desugar ../
-	cp memtest ../
+	cp toolbox ../
 
 clean:
-	rm -f memtest desugar *.o
+	rm -f memtest toolbox *.o
 

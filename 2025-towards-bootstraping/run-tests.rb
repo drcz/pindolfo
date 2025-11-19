@@ -5,20 +5,20 @@
 ##############################
 
 TESTS = [
-  ["classics-0.pindolfo", "classics-0-test.suite"],
-  ["classics-1.pindolfo", "classics-1-test.suite"],
-  ["t23.pindolfo", "t23-test.suite"],
-  ["substring.pindolfo", "substring-test.suite"],
-  ["drc.pindolfo", "drc-test.suite"],
-  ["lisp0.pindolfo", "lisp0-test.suite"],
-  ["PinP.pindolfo", "PinP-test.suite"],
-  ["bnd+reqs.pindolfo", "bnd+reqs-test.suite"],
+  ["tests/classics-0.pindolfo", "tests/classics-0-test.suite"],
+  ["tests/classics-1.pindolfo", "tests/classics-1-test.suite"],
+  ["tests/t23.pindolfo", "tests/t23-test.suite"],
+  ["tests/substring.pindolfo", "tests/substring-test.suite"],
+  ["tests/drc.pindolfo", "tests/drc-test.suite"],
+  ["tests/lisp0.pindolfo", "tests/lisp0-test.suite"],
+  ["tests/PinP.pindolfo", "tests/PinP-test.suite"],
+  ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
 
 #####################################################################
-def ok_compilte(fn)
+def ok_compilate(fn)
   m = "ok"
   m = "file #{fn} does not exist!" if !File.exist?(fn)
   m = "file #{fn} empty!" if File.zero?(fn)
@@ -30,7 +30,7 @@ def run_test(pndlf_fname, tests_fname)
   print "* testing #{pndlf_fname} via #{tests_fname} "
   err_msgs = []
   compilate_fname = pndlf_fname.gsub(".pindolfo",".scm")
-  msg = ok_compilte(compilate_fname)
+  msg = ok_compilate(compilate_fname)
   if msg != "ok"
     err_msgs << msg 
     puts msg
@@ -57,7 +57,7 @@ puts "welcome to the cool side of the pillow."
 TESTS.each{|pndlf_fname, tests_fname|
   compilate_fname = pndlf_fname.gsub(".pindolfo",".scm")
   print "* compiling #{pndlf_fname}... "
-  `../compile.rb #{pndlf_fname} #{compilate_fname} 2> /dev/null` # he_he
+  `./compile.sh #{pndlf_fname} #{compilate_fname} 2> /dev/null` # he_he
   if File.exist?(compilate_fname)
     print "ok, now guile compiles it... "
     `echo "aaa" | guile #{compilate_fname} 2>&1 > /dev/null` # XD

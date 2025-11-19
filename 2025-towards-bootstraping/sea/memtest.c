@@ -17,7 +17,7 @@ void test_mem() {
     s1 = mk_sym("Eris");
     assert(REFCOUNT(s1)==1); /* 1 for the_symbols ref y'know */
     assert(TYPE(s1)==SYM);
-    s4 = all_symbols();
+    s4 = get_all_symbols();
     assert(s4 != NIL);
     assert(CAR(s4)==s1);
     assert(CDR(s4)==NIL);
@@ -25,7 +25,7 @@ void test_mem() {
     s2 = mk_sym("Eris");
     assert(s2==s1);
     assert(REFCOUNT(s1)==1);
-    s4 = all_symbols();
+    s4 = get_all_symbols();
     assert(CAR(s4)==s1);
     assert(CDR(s4)==NIL);
 
@@ -33,14 +33,14 @@ void test_mem() {
     assert(s2!=s1);
     assert(TYPE(s2)==SYM);
     assert(REFCOUNT(s2)==1);
-    s4 = all_symbols();
+    s4 = get_all_symbols();
     assert(CAR(s4)==s2);
     assert(CAR(CDR(s4))==s1);
     assert(CDR(CDR(s4))==NIL);
     printf("mk_sym ok\n");
 
     printf("the_symbols:");
-    for(SE *s = all_symbols(); s!=NIL; s=CDR(s)) {
+    for(SE *s = get_all_symbols(); s!=NIL; s=CDR(s)) {
         assert(TYPE(CAR(s))==SYM);
         assert(REFCOUNT(CAR(s))>0);
         printf(" %s", SYMVAL(CAR(s)));
@@ -73,14 +73,14 @@ void test_mem() {
     printf("put_back pt.1 ok\n");
 
     s0 = NIL; s1 = mk_sym("SPACE-FILLA");
-    n = free_cells_count();
+    n = get_free_cells_count();
     printf("free cells: %lu\n", n);
     for(int i=0;i<1000;i++) s0 = mk_cons(s1,s0);
     printf("1k space-fillas ok\n");
-    printf("free cells: %lu\n", free_cells_count());
+    printf("free cells: %lu\n", get_free_cells_count());
     printf("now put_back...\n");
     put_back_SE(s0);
-    m = free_cells_count();
+    m = get_free_cells_count();
     printf("free cells: %lu\n", m);
     assert(n==m);
     printf("put_back pt.2 ok\n");

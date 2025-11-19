@@ -4,17 +4,16 @@
 
 #include "se.h"
 
+UL the_heap_size = 0;
 SE *the_heap = NIL;
 SE *the_free_cells = NIL;
 SE *the_symbols = NIL;
 
 void alloc_heap(UL heap_size) {
     unsigned int i;
-    if(the_heap != NIL) { free(the_heap);
-                          the_heap = NIL; }
-    the_heap = (SE *)malloc(sizeof(SE) * heap_size);
-    assert(the_heap);
-    the_symbols = NIL; the_free_cells = NIL;
+    if(the_heap != NIL) { free(the_heap); the_heap = NIL; }
+    the_heap = (SE *)malloc(sizeof(SE) * heap_size); assert(the_heap);
+    the_heap_size = heap_size; the_symbols = NIL; the_free_cells = NIL;
     for(i=0; i<heap_size; i++) { TYPE(&the_heap[i]) = CONS;
                                  CAR(&the_heap[i]) = NIL;
                                  CDR(&the_heap[i]) = the_free_cells;
@@ -41,14 +40,16 @@ void put_back_SE(SE *s) {
     }
 }
 
-UL free_cells_count() {
+UL get_heap_size() { return the_heap_size; }
+
+UL get_free_cells_count() {
     SE *s; UL n;
     for(n=0,s=the_free_cells; s!=NIL; s=CDR(s),n++)
         assert(TYPE(s)==CONS && REFCOUNT(s)==0); /* SANITY */
     return n;
 }
 
-SE *all_symbols() { return the_symbols; }
+SE *get_all_symbols() { return the_symbols; }
 
 SE *mk_cons(SE *car, SE *cdr) {
     SE *s = pick_up_SE();

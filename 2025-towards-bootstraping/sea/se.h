@@ -21,8 +21,9 @@ struct SE { SEtype type;
 #define CDR(E) (E)->cons[1]
 
 void alloc_heap(UL);
-UL free_cells_count();
-SE *all_symbols();
+UL get_heap_size();
+UL get_free_cells_count();
+SE *get_all_symbols();
 
 SE *mk_cons(SE *, SE *);
 SE *mk_num(UL);
