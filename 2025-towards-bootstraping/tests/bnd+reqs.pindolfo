@@ -17,7 +17,7 @@
  (('bnd+reqs ((() ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr NIL?) . ,reqs)
                                                  ^(bnd+reqs ,todo ,reqs* ,bnd))
 
- (('bnd+reqs ((%n ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr EQ? ,n) . ,reqs)
+ (('bnd+reqs ((#n ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr EQ? ,n) . ,reqs)
                                                  ^(bnd+reqs ,todo ,reqs* ,bnd))
 
  (('bnd+reqs ((('quote $s) ?addr) . ?todo) ?reqs ?bnd) => reqs* <- `((,addr EQ? (quote ,s)) . ,reqs)

@@ -15,7 +15,7 @@
 ;(--------------------------------------------------------------------)
 (('compiled* ()) => '((CONST ())))
 (('compiled* 'T) => '((CONST T)))
-(('compiled* %n) => `((CONST ,n)))
+(('compiled* #n) => `((CONST ,n)))
 (('compiled* 'car) => '((CAR)))
 (('compiled* 'cdr) => '((CDR)))
 (('compiled* 'cons) => '((CONS)))
@@ -26,6 +26,7 @@
 (('compiled* '+) => '((PLUS)))
 (('compiled* '-) => '((MINUS)))
 (('compiled* '*) => '((TIMES)))
+(('compiled* '%) => '((MODULO)))
 
 (('compiled* $sym) => `((LOOKUP ,sym)))
 
@@ -98,15 +99,16 @@
 (('step* ?D ((?h . ?t) . ?R) (('ATOM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
 (('step* ?D (    _     . ?R) (('ATOM?) . ?C)) => ^(step* ,D (T  . ,R) ,C))
 
-(('step* ?D ( %n . ?R) (('NUM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
+(('step* ?D ( #n . ?R) (('NUM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
 (('step* ?D (  _ . ?R) (('NUM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
 
 (('step* ?D ( $s . ?R) (('SYM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
 (('step* ?D (  _ . ?R) (('SYM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
 
-(('step* ?D ( ?n ?m . ?R) ( ('PLUS) . ?C)) => ^(step* ,D (,(+ n m) . ,R) ,C))
-(('step* ?D ( ?n ?m . ?R) (('MINUS) . ?C)) => ^(step* ,D (,(- n m) . ,R) ,C))
-(('step* ?D ( ?n ?m . ?R) (('TIMES) . ?C)) => ^(step* ,D (,(* n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) (  ('PLUS) . ?C)) => ^(step* ,D (,(+ n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) ( ('MINUS) . ?C)) => ^(step* ,D (,(- n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) ( ('TIMES) . ?C)) => ^(step* ,D (,(* n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) (('MODULO) . ?C)) => ^(step* ,D (,(% n m) . ,R) ,C))
 
 ;(- CONTROL FLOW, i.e. operating on C -)
 (('step* ?D (() . ?R) (('SELECT ?p ?p*) . ?C)) => ^(step* ,D ,R ,^(apd ,p* ,C)))

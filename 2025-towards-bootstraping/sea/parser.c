@@ -32,7 +32,7 @@ void get_token() {
     case ';': cur_token.type = T_COMMENT; return;
     case '@': cur_token.type = T_ATM_A; return;
     case '$': cur_token.type = T_SYM_A; return;
-    case '%': cur_token.type = T_NUM_A; return;
+    case '#': cur_token.type = T_NUM_A; return;
     case '?': cur_token.type = T_EXP_A; return;
     case '(': cur_token.type = T_LPAR; return;
     case ')': cur_token.type = T_RPAR; return;
@@ -40,8 +40,7 @@ void get_token() {
     default: do { cur_token.buffer[i++] = c; }
              while ( i<TOK_BUFFER_SIZE &&
                      (c = getc(stdin))!=EOF &&
-                      !isspace(c) && c!='(' && c!=')'
-                      /*&& c!='\'' && c!='`' && c!=','*/ );
+                      !isspace(c) && c!='(' && c!=')') ;
              ungetc(c, stdin);
              cur_token.buffer[i] = '\0';
              cur_token.type = isdigit(cur_token.buffer[0])? T_NUM : T_SYM;

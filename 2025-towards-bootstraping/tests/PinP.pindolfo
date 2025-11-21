@@ -5,9 +5,9 @@
 
 (('match? ()          () ?bnd) => bnd)
 (('match? '_           _ ?bnd) => bnd)
-(('match? %n          %n ?bnd) => bnd)
+(('match? #n          #n ?bnd) => bnd)
 (('match? ('quote ?e) ?e ?bnd) => bnd)
-(('match? ('num $nv)  %e ?bnd) => ^(match-var ,nv ,e ,bnd))
+(('match? ('num $nv)  #e ?bnd) => ^(match-var ,nv ,e ,bnd))
 (('match? ('num _ )    _   _ ) => 'NO-MATCH)
 (('match? ('sym $sv)  $e ?bnd) => ^(match-var ,sv ,e ,bnd))
 (('match? ('sym _ )    _   _ ) => 'NO-MATCH)
@@ -35,7 +35,7 @@
 
 ;( --- evaluator ----------------------------------------------- )
 (('value () _ _) => ())
-(('value %n _ _) => n)
+(('value #n _ _) => n)
 (('value ('quote ?e) _ _) => e)
 
 (('value ('quasiquote ?qq) ?bnd ?app) ^(val-qq ,qq ,bnd ,app))
@@ -45,6 +45,8 @@
 (('value ('- ?e ?e*) ?bnd ?app) => (- ^(value ,e ,bnd ,app)
                                       ^(value ,e* ,bnd ,app)))
 (('value ('* ?e ?e*) ?bnd ?app) => (* ^(value ,e ,bnd ,app)
+                                      ^(value ,e* ,bnd ,app)))
+(('value ('% ?e ?e*) ?bnd ?app) => (% ^(value ,e ,bnd ,app)
                                       ^(value ,e* ,bnd ,app)))
 
 (('value ('rec ?a) ?bnd ?app) => ^(,app ,^(val-qq ,a ,bnd ,app)))

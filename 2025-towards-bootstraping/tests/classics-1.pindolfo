@@ -9,7 +9,7 @@
      (('map ?f ?xs) => ^(fold-r (cons*f.hd ,f) () ,xs))
      
      (('dup ?x) => `(,x . ,x))
-     (('dbl %n) => (+ n n))
+     (('dbl #n) => (+ n n))
      
      (('rev ?xs) => ^(rev ,xs ()))
      (('rev ()         ?rs) => rs)

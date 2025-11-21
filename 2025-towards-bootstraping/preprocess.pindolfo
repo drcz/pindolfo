@@ -14,6 +14,10 @@
  (('SUB ?bnd 'in $sym            ) => ^(LU/id ,sym ,bnd))
  (('SUB ?bnd 'in ('quasiquote ?e)) => `(quasiquote ,^(SUB-qq ,bnd in ,e)))
  (('SUB ?bnd 'in ('rec ?e)       ) => `(rec ,^(SUB-qq ,bnd in ,e)))
+ (('SUB ?bnd 'in ('+ ?e ?e*)     ) => `(+ ,^(SUB ,bnd in ,e) ,^(SUB ,bnd in ,e*)))
+ (('SUB ?bnd 'in ('- ?e ?e*)     ) => `(- ,^(SUB ,bnd in ,e) ,^(SUB ,bnd in ,e*)))
+ (('SUB ?bnd 'in ('* ?e ?e*)     ) => `(* ,^(SUB ,bnd in ,e) ,^(SUB ,bnd in ,e*)))
+ (('SUB ?bnd 'in ('% ?e ?e*)     ) => `(% ,^(SUB ,bnd in ,e) ,^(SUB ,bnd in ,e*)))
  (('SUB ?bnd 'in ?e              ) => e)
 
  (('SUB-qq ?bnd 'in ('unquote ?e)) => `(,'unquote ,^(SUB ,bnd in ,e))) ;(nb unquote the unquote to quote it!)

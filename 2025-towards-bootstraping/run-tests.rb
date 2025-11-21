@@ -7,6 +7,8 @@
 TESTS = [
   ["tests/classics-0.pindolfo", "tests/classics-0-test.suite"],
   ["tests/classics-1.pindolfo", "tests/classics-1-test.suite"],
+  ["tests/gcd.pindolfo", "tests/gcd-test.suite"],
+  ["tests/sosq.pindolfo", "tests/sosq-test.suite"],
   ["tests/t23.pindolfo", "tests/t23-test.suite"],
   ["tests/substring.pindolfo", "tests/substring-test.suite"],
   ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],

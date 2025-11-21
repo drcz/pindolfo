@@ -37,7 +37,7 @@
 (('step* ?D ((?h . ?t) . ?R) (('ATOM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
 (('step* ?D (    _     . ?R) (('ATOM?) . ?C)) => ^(step* ,D (T  . ,R) ,C))
 
-(('step* ?D ( %n . ?R) (('NUM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
+(('step* ?D ( #n . ?R) (('NUM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
 (('step* ?D (  _ . ?R) (('NUM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
 
 (('step* ?D ( $s . ?R) (('SYM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))

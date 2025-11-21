@@ -32,7 +32,7 @@
 (define var? symbol?)
 (define (vartype? x) (member? x '(num sym atm exp)))
 
-(define (binop? x) (member? x '(+ * -)))
+(define (binop? x) (member? x '(+ * - %)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; first we turn the source program [a list of (pattern action) clauses]
@@ -115,11 +115,11 @@
   (let cmpld ((expr expr))
     (match expr
       (() ''()) ;; !!
-      ('T ''T)
       ((? var? v) (sym+sym 'v- v))
       ((? number? num) num)
       (('quote e) expr)
       (('quasiquote qq) (cons<-quasiquote qq cmpld))
+      (('% e e*) `(modulo ,(cmpld e) ,(cmpld e*))) ;; sorry ;)
       (((? binop? o) e e*) `(,o ,(cmpld e) ,(cmpld e*)))
       (('rec e) (lookup expr apps2vars)))))
 

@@ -3,8 +3,8 @@
  (('APD (?x . ?xs) ?ys) `(,x . ,^(APD ,xs ,ys)))
 
  (('MUL  0  _) 0)
- (('MUL  1 %x) x)
- (('MUL %x %y) (+ y ^(MUL ,(- x 1) ,y)))
+ (('MUL  1 #x) x)
+ (('MUL #x #y) (+ y ^(MUL ,(- x 1) ,y)))
 
  (('REV ?xs) ^(REV ,xs ()))
  (('REV () ?rs) rs)
