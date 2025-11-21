@@ -1,0 +1,130 @@
+(
+;(--------------------------------------------------------------------)
+;(- LISP0 -> DRC compiler, practically the same as on 2024...        -)
+;(--------------------------------------------------------------------)
+
+(('rev ?xs)            => ^(rev ,xs ()))
+(('rev    ()      ?rs) =>  rs)
+(('rev (?x . ?xs) ?rs) => ^(rev ,xs (,x . ,rs)))
+
+(('apd    ()      ?ys) => ys)
+(('apd (?x . ?xs) ?ys) => `(,x . ,^(apd ,xs ,ys)))
+
+(('map*apd ?prc    ()     ) => ())
+(('map*apd ?prc (?x . ?xs)) => ^(apd ,^(,prc ,x) ,^(map*apd ,prc ,xs)))
+;(--------------------------------------------------------------------)
+(('compiled* ()) => '((CONST ())))
+(('compiled* 'T) => '((CONST T)))
+(('compiled* %n) => `((CONST ,n)))
+(('compiled* 'car) => '((CAR)))
+(('compiled* 'cdr) => '((CDR)))
+(('compiled* 'cons) => '((CONS)))
+(('compiled* 'eq?) => '((EQ?)))
+(('compiled* 'num?) => '((NUM?)))
+(('compiled* 'sym?) => '((SYM?)))
+(('compiled* 'atm?) => '((ATOM?)))
+(('compiled* '+) => '((PLUS)))
+(('compiled* '-) => '((MINUS)))
+(('compiled* '*) => '((TIMES)))
+
+(('compiled* $sym) => `((LOOKUP ,sym)))
+
+(('compiled* ('quote ?e)) => `((CONST ,e)))
+
+(('compiled* ('if ?p ?c ?a)) => ^(apd ,^(compiled* ,p)
+                                      ((SELECT ,^(compiled* ,c)
+                                               ,^(compiled* ,a)))))
+
+(('compiled* ('lambda ?vs ?body)) => `((PROC ,^(apd ,^(name-block ,vs)
+                                               ,^(apd ,^(compiled* ,body)
+                                                      ,^(forget-block ,vs))))))
+
+(('compiled* ('def $v ?e)) => ^(apd ,^(compiled* ,e) ((NAME ,v))))
+
+(('compiled* (?rator . ?rands)) => ^(apd ,^(map*apd compiled*
+                                                    ,^(rev (,rator . ,rands)))
+                                         ,^(maybe-apply ,rator)))
+
+(('name-block ()        ) => ())
+(('name-block ($n . ?ns)) => `((NAME ,n) . ,^(name-block ,ns)))
+
+(('forget-block ()        ) => ())
+(('forget-block ($n . ?ns)) => `((FORGET ,n) . ,^(forget-block ,ns)))
+
+(('maybe-apply 'car ) => ())
+(('maybe-apply 'cdr ) => ())
+(('maybe-apply 'cons) => ())
+(('maybe-apply 'eq? ) => ())
+(('maybe-apply 'num?) => ())
+(('maybe-apply 'sym?) => ())
+(('maybe-apply 'atm?) => ())
+(('maybe-apply '+   ) => ())
+(('maybe-apply '-   ) => ())
+(('maybe-apply '*   ) => ())
+(('maybe-apply _    ) => '((APPLY)))
+
+(('compiled ?program) => ^(map*apd compiled* ,program))
+
+;(--------------------------------------------------------------------)
+;(- now again, the DRC machine (in direct style)                     -)
+
+;( -- operations on dictionary (the D register) -- )
+(('name $k ?v ?dict) => `((,k . ,v) . ,dict))
+
+(('forget $k ()                ) => ())
+(('forget $k (($k . _) . ?dict)) => dict)
+(('forget $k (       _ . ?dict)) => ^(forget ,k ,dict))
+
+(('lookup $k (($k . ?v) . _    )) => v)
+(('lookup $k (        _ . ?dict)) => ^(lookup ,k ,dict))
+
+;(- STORE, i.e. operating on D -)
+(('step* ?D (?e . ?R) (  ('NAME $n) . ?C)) => ^(step* ,^(name ,n ,e ,D) ,R ,C))
+(('step* ?D    ?R     (('FORGET $n) . ?C)) => ^(step* ,^(forget ,n ,D)  ,R ,C))
+(('step* ?D    ?R     (('LOOKUP $n) . ?C)) => ^(step* ,D (,^(lookup ,n ,D) . ,R) ,C))
+
+;(- CONSTANTS AND OPS, i.e. operating on R -)
+(('step* ?D ?R (('CONST ?e) . ?C)) => ^(step* ,D (,e . ,R) ,C))
+(('step* ?D ?R ( ('PROC ?p) . ?C)) => ^(step* ,D (,p . ,R) ,C))
+
+(('step* ?D ( ?h ?t . ?R) (('CONS) . ?C)) => ^(step* ,D ((,h . ,t) . ,R) ,C))
+
+(('step* ?D ((?h . ?t) . ?R) (('CAR) . ?C)) => ^(step* ,D (,h . ,R) ,C))
+(('step* ?D ((?h . ?t) . ?R) (('CDR) . ?C)) => ^(step* ,D (,t . ,R) ,C))
+
+(('step* ?D (?e ?e . ?R) (('EQ?) . ?C)) => ^(step* ,D (T  . ,R) ,C))
+(('step* ?D ( _  _ . ?R) (('EQ?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+
+(('step* ?D ((?h . ?t) . ?R) (('ATOM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+(('step* ?D (    _     . ?R) (('ATOM?) . ?C)) => ^(step* ,D (T  . ,R) ,C))
+
+(('step* ?D ( %n . ?R) (('NUM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
+(('step* ?D (  _ . ?R) (('NUM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+
+(('step* ?D ( $s . ?R) (('SYM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
+(('step* ?D (  _ . ?R) (('SYM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+
+(('step* ?D ( ?n ?m . ?R) ( ('PLUS) . ?C)) => ^(step* ,D (,(+ n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) (('MINUS) . ?C)) => ^(step* ,D (,(- n m) . ,R) ,C))
+(('step* ?D ( ?n ?m . ?R) (('TIMES) . ?C)) => ^(step* ,D (,(* n m) . ,R) ,C))
+
+;(- CONTROL FLOW, i.e. operating on C -)
+(('step* ?D (() . ?R) (('SELECT ?p ?p*) . ?C)) => ^(step* ,D ,R ,^(apd ,p* ,C)))
+(('step* ?D (_  . ?R) (('SELECT ?p ?p*) . ?C)) => ^(step* ,D ,R ,^(apd ,p ,C)))
+
+(('step* ?D (?p . ?R) (('APPLY) . ?C)) => ^(step* ,D ,R ,^(apd ,p ,C)))
+
+;(- halting? not a problem he_he -)
+(('step* ?D (?e . ?R) ()) => e)
+
+;(- but before halting it's worth to be able to start it...  -)
+(('run-drc ?program ?inputs) => ^(step* () ,inputs ,program))
+
+
+
+;(--------------------------------------------------------------------)
+;(- finally an interface for testing/using the thing...              -)
+
+(('compile-and-run ?lisp-src) => drc-target <- ^(compiled ,lisp-src)
+                                 ^(run-drc ,drc-target ()))
+)

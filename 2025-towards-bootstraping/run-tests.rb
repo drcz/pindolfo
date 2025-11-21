@@ -9,10 +9,11 @@ TESTS = [
   ["tests/classics-1.pindolfo", "tests/classics-1-test.suite"],
   ["tests/t23.pindolfo", "tests/t23-test.suite"],
   ["tests/substring.pindolfo", "tests/substring-test.suite"],
+  ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],
   ["tests/drc.pindolfo", "tests/drc-test.suite"],
   ["tests/lisp0.pindolfo", "tests/lisp0-test.suite"],
   ["tests/PinP.pindolfo", "tests/PinP-test.suite"],
-  ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],
+  ["tests/lisp2drc.pindolfo", "tests/lisp2drc-test.suite"]
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
