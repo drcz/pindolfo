@@ -1,0 +1,38 @@
+(lookup 1 in ((0 blaa) (1 elo) (2 nice))) | elo
+(lookup 2 in ((0 blaa) (1 elo) (2 nice))) | nice
+(lookup 3 in ((0 blaa) (1 elo) (2 nice))) | NOT-FOUND
+(extract (D D) from (q w e r t y)) | (e r t y)
+(extract (D D A) from (q w e r t y)) | e
+(extract (D D D) from (q w e r t y)) | (r t y)
+(NIL? ()) | YES
+(NIL? a) | NO
+(NIL? 23) | NO
+(CONS? ()) | NO
+(CONS? (elo)) | YES
+(CONS? 23) | NO
+(NUM? 23) | YES
+(NUM? (elo)) | NO
+(ATM? (elo)) | NO
+(ATM? 23) | YES
+(ATM? ()) | YES
+(ATM? elo) | YES
+(EQ? 23 23) | YES
+(EQ? (q w e) (q w e)) | YES
+(EQ? (q w e) (q w a)) | NO
+(EQ? 23 42) | NO
+(EQ? (q w e) 23) | NO
+(test (CONS? (D A)) wrt (123 (a . b) ())) | YES
+(test (CONS? (A)) wrt (123 (a . b) ())) | NO
+(test (NUM? (A)) wrt (123 (a . b) ())) | YES
+(test (EQ? (A) (D A)) wrt (123 123 ())) | YES
+(test (EQ? (A) (D A)) wrt (123 321 ())) | NO
+(step () (2 3 69) ((ADD)) ppp) | (() (5 69) ())
+(step () (4 2 46) ((SUB)) ppp) | (() (2 46) ())
+(step () (4 2) ((CONS)) ppp) | (() ((4 . 2)) ())
+(step ((q w e)) (42 69) ((LD (D A)) (CONS)) ppp) | (((q w e)) (w 42 69) ((CONS)))
+(step ((q w e)) (69 42) ((ST)) ppp) | (((69 q w e)) (42) ())
+(step ((q w e)) (69 42 997) ((CALL L4 2) (CONS)) ((L4 sth))) | (((69 42) (q w e)) (997) (sth (CONS)))
+
+
+
+
