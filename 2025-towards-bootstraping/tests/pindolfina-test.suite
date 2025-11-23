@@ -26,13 +26,11 @@
 (test (NUM? (A)) wrt (123 (a . b) ())) | YES
 (test (EQ? (A) (D A)) wrt (123 123 ())) | YES
 (test (EQ? (A) (D A)) wrt (123 321 ())) | NO
+(test (and (CONS? (D A)) (NUM? (A)) (NIL? (D D A))) wrt (123 (a . b) ())) | YES
+(test (and (CONS? (D A)) (NUM? (A)) (NIL? (D D A))) wrt (123 ab ())) | NO
 (step () (2 3 69) ((ADD)) ppp) | (() (5 69) ())
 (step () (4 2 46) ((SUB)) ppp) | (() (2 46) ())
 (step () (4 2) ((CONS)) ppp) | (() ((4 . 2)) ())
 (step ((q w e)) (42 69) ((LD (D A)) (CONS)) ppp) | (((q w e)) (w 42 69) ((CONS)))
 (step ((q w e)) (69 42) ((ST)) ppp) | (((69 q w e)) (42) ())
 (step ((q w e)) (69 42 997) ((CALL L4 2) (CONS)) ((L4 sth))) | (((69 42) (q w e)) (997) (sth (CONS)))
-
-
-
-

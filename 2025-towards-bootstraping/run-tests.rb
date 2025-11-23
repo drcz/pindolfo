@@ -16,7 +16,8 @@ TESTS = [
   ["tests/drc.pindolfo", "tests/drc-test.suite"],
   ["tests/lisp0.pindolfo", "tests/lisp0-test.suite"],
   ["tests/PinP.pindolfo", "tests/PinP-test.suite"],
-  ["tests/lisp2drc.pindolfo", "tests/lisp2drc-test.suite"]
+  ["tests/lisp2drc.pindolfo", "tests/lisp2drc-test.suite"],
+  ["tests/pindolfina.pindolfo", "tests/pindolfina-test.suite"]
 ]
 
 DELETE_COMPILATES_AFTERWARDS = true
