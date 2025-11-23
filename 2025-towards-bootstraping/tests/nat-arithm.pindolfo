@@ -18,11 +18,4 @@
  (('sosq #n #m) => n2 <- (* n n)
                    m2 <- (* m m)
                    (+ n2 m2))
-
- ;(- meh... -)
- (('merge ()         ?ys       ) => ys)
- (('merge ?xs        ()        ) => xs)
- (('merge (#x . ?xs) (#y . ?ys)) => ^(merge0 ,(< x y) ,x ,y ,xs ,ys))
- (('merge0 'YES #x #y ?xs ?ys) => `(,x . ,^(merge ,xs (,y . ,ys))))
- (('merge0 'NO  #x #y ?xs ?ys) => `(,y . ,^(merge (,x . ,xs) ,ys)))
 )

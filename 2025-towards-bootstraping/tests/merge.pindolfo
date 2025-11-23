@@ -1,0 +1,24 @@
+(
+ ;(- now a parody of merge sort, mostly to test < and to realize problems -)
+ (('take  0 'from _         ) => ())
+ (('take #n 'from (?x . ?xs)) => `(,x . ,^(take ,(- n 1) from ,xs)))
+
+ (('drop  0 'from ?xs       ) => xs)
+ (('drop #n 'from (?x . ?xs)) => ^(drop ,(- n 1) from ,xs))
+
+ (('length ()       ) => 0)
+ (('length (_ . ?xs)) => (+ 1 ^(length ,xs)))
+
+ (('merge# ()         ?ys       ) => ys)
+ (('merge# ?xs        ()        ) => xs)
+ (('merge# (#x . ?xs) (#y . ?ys)) => ^(merge#0 ,(< x y) ,x ,y ,xs ,ys))
+ (('merge#0 'YES #x #y ?xs ?ys) => `(,x . ,^(merge# ,xs (,y . ,ys))))
+ (('merge#0 'NO  #x #y ?xs ?ys) => `(,y . ,^(merge# (,x . ,xs) ,ys)))
+
+ (('sort# ()  ) => ())
+ (('sort# (#n)) => `(,n))
+ (('sort# ?ns ) => half <- (/ ^(length ,ns) 2)
+                   left <- ^(take ,half from ,ns)
+                   right <- ^(drop ,half from ,ns)
+                   ^(merge# ,^(sort# ,left) ,^(sort# ,right)))
+)
