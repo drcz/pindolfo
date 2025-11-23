@@ -28,7 +28,7 @@
 (define var? symbol?)
 (define (vartype? x) (member? x '(num sym atm exp)))
 
-(define (binop? x) (member? x '(+ * - %)))
+(define (binop? x) (member? x '(+ * - / % <)))
 
 (define DISPATCH-VARNAME 'v0)
 
@@ -117,7 +117,11 @@
       ((? number? num) num)
       (('quote e) expr)
       (('quasiquote qq) (cons<-quasiquote qq cmpld))
-      (('% e e*) `(modulo ,(cmpld e) ,(cmpld e*))) ;; sorry
+      (('/ e e*) `(quotient ,(cmpld e) ,(cmpld e*))) ;; sorry!
+      (('% e e*) `(modulo ,(cmpld e) ,(cmpld e*))) ;; sorry!
+      (('< e e*) `((lambda (n m)
+                     (if (< n m) 'YES 'NO))
+                   ,(cmpld e) ,(cmpld e*))) ;; super sorry!
       (((? binop? o) e e*) `(,o ,(cmpld e) ,(cmpld e*)))
       (('rec e) (lookup expr apps2vars)))))
 

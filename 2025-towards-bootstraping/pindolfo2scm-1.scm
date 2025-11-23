@@ -32,7 +32,7 @@
 (define var? symbol?)
 (define (vartype? x) (member? x '(num sym atm exp)))
 
-(define (binop? x) (member? x '(+ * - %)))
+(define (binop? x) (member? x '(+ * - / % <)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; first we turn the source program [a list of (pattern action) clauses]
@@ -119,7 +119,11 @@
       ((? number? num) num)
       (('quote e) expr)
       (('quasiquote qq) (cons<-quasiquote qq cmpld))
-      (('% e e*) `(modulo ,(cmpld e) ,(cmpld e*))) ;; sorry ;)
+      (('/ e e*) `(quotient ,(cmpld e) ,(cmpld e*))) ;; sorry!
+      (('% e e*) `(modulo ,(cmpld e) ,(cmpld e*))) ;; sorry!
+      (('< e e*) `((lambda (n m)
+                     (if (< n m) 'YES 'NO))
+                   ,(cmpld e) ,(cmpld e*))) ;; super sorry!
       (((? binop? o) e e*) `(,o ,(cmpld e) ,(cmpld e*)))
       (('rec e) (lookup expr apps2vars)))))
 
@@ -385,6 +389,6 @@
         target-src)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(display ";; pindolfo2scm v1.2") (newline)
+(display ";; pindolfo2scm v1.3") (newline)
 (map pretty-print (compiled (read)))
 (newline)

@@ -1,5 +1,0 @@
-(;(- we test preprocessing here really... -)
- (('sosq #n #m) => n2 <- (* n n)
-                   m2 <- (* m m)
-                   (+ n2 m2))
-)

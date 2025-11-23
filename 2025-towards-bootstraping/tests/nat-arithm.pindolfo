@@ -1,0 +1,28 @@
+(;(- please keep in mind pindolfo is NOT for arithmetics... -)
+
+ ;(- silly... -)
+ (('test0 #n #m) => (< n m))
+ (('test1 #n #m) => (< (+ n 5) (* m m)))
+ (('test-div #n #m) (/ n m))
+ (('test-mod #n #m) (% n m))
+ (('test-divmod #n #m) (+ (/ n m) (% n m)))
+
+ ;(- ugly... -)
+ (('gcd  0 #b) b)
+ (('gcd #a  0) a)
+ (('gcd #a #b) ^(gcd* ,(% a b) ,b))
+ (('gcd*  0 #b) b)
+ (('gcd* #a #b) ^(gcd ,a ,(% b a)))
+
+ ;(- and here we test preprocessing here really... -)
+ (('sosq #n #m) => n2 <- (* n n)
+                   m2 <- (* m m)
+                   (+ n2 m2))
+
+ ;(- meh... -)
+ (('merge ()         ?ys       ) => ys)
+ (('merge ?xs        ()        ) => xs)
+ (('merge (#x . ?xs) (#y . ?ys)) => ^(merge0 ,(< x y) ,x ,y ,xs ,ys))
+ (('merge0 'YES #x #y ?xs ?ys) => `(,x . ,^(merge ,xs (,y . ,ys))))
+ (('merge0 'NO  #x #y ?xs ?ys) => `(,y . ,^(merge (,x . ,xs) ,ys)))
+)

@@ -46,7 +46,11 @@
                                       ^(value ,e* ,bnd ,app)))
 (('value ('* ?e ?e*) ?bnd ?app) => (* ^(value ,e ,bnd ,app)
                                       ^(value ,e* ,bnd ,app)))
+(('value ('/ ?e ?e*) ?bnd ?app) => (/ ^(value ,e ,bnd ,app)
+                                      ^(value ,e* ,bnd ,app)))
 (('value ('% ?e ?e*) ?bnd ?app) => (% ^(value ,e ,bnd ,app)
+                                      ^(value ,e* ,bnd ,app)))
+(('value ('< ?e ?e*) ?bnd ?app) => (< ^(value ,e ,bnd ,app)
                                       ^(value ,e* ,bnd ,app)))
 
 (('value ('rec ?a) ?bnd ?app) => ^(,app ,^(val-qq ,a ,bnd ,app)))
