@@ -11,6 +11,7 @@ TESTS = [
   ["tests/sosq.pindolfo", "tests/sosq-test.suite"],
   ["tests/t23.pindolfo", "tests/t23-test.suite"],
   ["tests/substring.pindolfo", "tests/substring-test.suite"],
+  ["tests/lists.pindolfo", "tests/lists-test.suite"],
   ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],
   ["tests/drc.pindolfo", "tests/drc-test.suite"],
   ["tests/lisp0.pindolfo", "tests/lisp0-test.suite"],

@@ -1,0 +1,29 @@
+(
+
+ (('take  0 'from _         ) => ())
+ (('take #n 'from (?x . ?xs)) => `(,x . ,^(take ,(- n 1) from ,xs)))
+
+ (('drop  0 'from ?xs       ) => xs)
+ (('drop #n 'from (?x . ?xs)) => ^(drop ,(- n 1) from ,xs))
+
+ (('nth  _ 'in ()        ) => 'OUT-OF-BOUND)
+ (('nth  0 'in (?x .   _)) => x)
+ (('nth #n 'in (_  . ?xs)) => ^(nth ,(- n 1) in ,xs))
+
+ (('index-of  _ 'in ()        ) => 'NOT-FOUND)
+ (('index-of ?x 'in (?x .   _)) => 0)
+ (('index-of ?x 'in ( _ . ?xs)) => ^(io-succ-or-not ,^(index-of ,x in ,xs)))
+ (('io-succ-or-not 'NOT-FOUND) => 'NOT-FOUND) ;(not too pretty...)
+ (('io-succ-or-not #n        ) => (+ 1 n)) ;(maybe it's better to let it fail?)
+
+ (('length ()       ) => 0)
+ (('length (_ . ?xs)) => (+ 1 ^(length ,xs)))
+
+ (('concat ()         ?ys) => ys)
+ (('concat (?x . ?xs) ?ys) => `(,x . ,^(concat ,xs ,ys)))
+
+ (('lookup    _ 'in ()                    ) => 'NOT-FOUND)
+ (('lookup ?key 'in ((?key ?val) .      _)) => val)
+ (('lookup ?key 'in (          _ . ?alist)) => ^(lookup ,key in ,alist))
+
+)

@@ -1,0 +1,17 @@
+(take 0 from (q w e a s d)) | ()
+(take 3 from (q w e a s d)) | (q w e)
+(drop 0 from (q w e a s d)) | (q w e a s d)
+(drop 3 from (q w e a s d)) | (a s d)
+(nth 0 in (q w e a s d)) | q
+(nth 3 in (q w e a s d)) | a
+(nth 5 in (q w e a s d)) | d
+(nth 7 in (q w e a s d)) | OUT-OF-BOUND
+(index-of q in (q w e)) | 0
+(index-of w in (q w e)) | 1
+(index-of a in (q w e)) | NOT-FOUND
+(length (q w e a s d)) | 6
+(concat (q w e) (a s d)) | (q w e a s d)
+(lookup 1 in ((0 blaa) (1 elo) (2 nice))) | elo
+(lookup 2 in ((0 blaa) (1 elo) (2 nice))) | nice
+(lookup 3 in ((0 blaa) (1 elo) (2 nice))) | NOT-FOUND
+(lookup (rich key) in ((0 blaa) (1 elo) ((rich key) nice))) | nice
