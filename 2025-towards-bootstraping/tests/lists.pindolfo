@@ -19,11 +19,60 @@
  (('length ()       ) => 0)
  (('length (_ . ?xs)) => (+ 1 ^(length ,xs)))
 
- (('concat ()         ?ys) => ys)
- (('concat (?x . ?xs) ?ys) => `(,x . ,^(concat ,xs ,ys)))
+ (('append ()         ?ys) => ys)
+ (('append (?x . ?xs) ?ys) => `(,x . ,^(append ,xs ,ys)))
+
+ (('append-map ?p ()        ) => ())
+ (('append-map ?p (?x . ?xs)) => ^(append ,^(,p ,x) ,^(append-map ,p ,xs)))
+
 
  (('lookup    _ 'in ()                    ) => 'NOT-FOUND)
  (('lookup ?key 'in ((?key ?val) .      _)) => val)
  (('lookup ?key 'in (          _ . ?alist)) => ^(lookup ,key in ,alist))
 
+
+ (('member?  _ ()        ) => 'NO)
+ (('member? ?x (?x . _  )) => 'YES)
+ (('member? ?x ( _ . ?xs)) => ^(member? ,x ,xs))
+
+ (('uniq ()) => ())
+ (('uniq (?x . ?xs)) => ^(uniq* ,x ,^(member? ,x ,xs) ,xs))
+ (('uniq*  _ 'YES ?xs) => ^(uniq ,xs))
+ (('uniq* ?x 'NO  ?xs) => `(,x . ,^(uniq ,xs)))
+
+ (('union ?xs ?ys) ^(uniq ,^(append ,xs ,ys)))
+
+ (('intersection () _ ) => ())
+ (('intersection _  ()) => ())
+ (('intersection (?x . ?xs) ?ys) => ^(intersection* ,^(member? ,x ,ys) ,x ,xs ,ys))
+ (('intersection* 'YES ?x ?xs ?ys) => `(,x . ,^(intersection ,xs ,ys)))
+ (('intersection* 'NO   _ ?xs ?ys) => ^(intersection ,xs ,ys))
+
+ ;(- hmmm sure? -)
+ (('filter-map ?F   _ ()        ) => ())
+ (('filter-map ?F ?op (?x . ?xs)) => ^(filter-map* ,F ,^(,op ,x) ,op ,xs))
+ (('filter-map* ?F ?F ?op ?xs) => ^(filter-map ,F ,op ,xs))
+ (('filter-map* ?F ?e ?op ?xs) => `(,e . ,^(filter-map ,F ,op ,xs)))
+
+ (('partition ?p ?xs) => ^(partition* ,p ,xs () ()))
+ (('partition* ?p ()         ?yes ?nos) => `(,yes ,nos))
+ (('partition* ?p (?x . ?xs) ?yes ?nos) => ^(partition** ,^(,p ,x) ,p ,x ,xs ,yes ,nos))
+ (('partition** 'YES ?p ?x ?xs ?yes ?nos) => ^(partition* ,p ,xs (,x . ,yes) ,nos))
+ (('partition** 'NO  ?p ?x ?xs ?yes ?nos) => ^(partition* ,p ,xs ,yes (,x . ,nos)))
+
+ (('any ?p ()        ) => 'NO)
+ (('any ?p (?x . ?xs)) => ^(any* ,^(,p ,x) ,p ,xs))
+ (('any* 'YES  _  _ ) => 'YES)
+ (('any* 'NO  ?p ?xs) => ^(any ,p ,xs))
+
+ (('every ?p ()) 'YES)
+ (('every ?p (?x . ?xs)) => ^(every* ,^(,p ,x) ,p ,xs))
+ (('every* 'NO   _  _ ) => 'NO)
+ (('every* 'YES ?p ?xs) => ^(every ,p ,xs))
+
+ ;(- only for testing... -)
+ (('NUM? #n) => 'YES)
+ (('NUM?  _) => 'NO)
+ (('MAYBE-SQ #n) => (* n n))
+ (('MAYBE-SQ  _) => 'NO)
 )

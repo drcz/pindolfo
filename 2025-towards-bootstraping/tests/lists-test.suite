@@ -10,8 +10,20 @@
 (index-of w in (q w e)) | 1
 (index-of a in (q w e)) | NOT-FOUND
 (length (q w e a s d)) | 6
-(concat (q w e) (a s d)) | (q w e a s d)
+(append (q w e) (a s d)) | (q w e a s d)
+(append-map uniq ((a a b) (b b c) (c c d))) | (a b b c c d)
 (lookup 1 in ((0 blaa) (1 elo) (2 nice))) | elo
 (lookup 2 in ((0 blaa) (1 elo) (2 nice))) | nice
 (lookup 3 in ((0 blaa) (1 elo) (2 nice))) | NOT-FOUND
 (lookup (rich key) in ((0 blaa) (1 elo) ((rich key) nice))) | nice
+(member? w (q w e)) | YES
+(member? x (q w e)) | NO
+(uniq (x y z x y z x)) | (y z x)
+(union (q w e r t y) (q w e a s d)) | (r t y q w e a s d)
+(intersection (q w e r t y) (a s d q w e)) | (q w e)
+(filter-map NO MAYBE-SQ (1 q w 2 e 3)) | (1 4 9)
+(partition NUM? (q 2 w 3 e (wat))) | ((3 2) ((wat) e w q))
+(any NUM? (q w 6 e)) | YES
+(any NUM? (q w e r)) | NO
+(every NUM? (3 2 1)) | YES
+(every NUM? (3 2 q)) | NO
