@@ -1,0 +1,6 @@
+(counterexamples for (≡ p q) given ()) | ((q (¬ p)) ((¬ q) p))
+(counterexamples for (≡ (→ p q) (→ (¬ q) (¬ p))) given ()) | ()
+(counterexamples for (≡ (→ p q) (→ (¬ p) (¬ q))) given ()) | (((¬ q) p) (p (¬ q)) (q (¬ p)) ((¬ p) q))
+(theorem? (v p (¬ p))) | YES
+(theorem? (¬ (& p (¬ p)))) | YES
+(theorem? (≡ (→ p q) (→ (¬ q) (¬ p)))) | YES

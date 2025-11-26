@@ -1,0 +1,98 @@
+(
+ ;(--------------------------------------------------------------------)
+ ;(- elementary stuff, mostly from lists.pindolfo                     -)
+ (('not 'YES) => 'NO)
+ (('not 'NO ) => 'YES)
+
+ (('empty? ()) => 'YES)
+ (('empty?  _) => 'NO)
+
+ (('any ?p ()        ) => 'NO)
+ (('any ?p (?x . ?xs)) => ^(any* ,^(,p ,x) ,p ,xs))
+ (('any* 'YES  _  _ ) => 'YES)
+ (('any* 'NO  ?p ?xs) => ^(any ,p ,xs))
+
+ (('append ()         ?ys) => ys)
+ (('append (?x . ?xs) ?ys) => `(,x . ,^(append ,xs ,ys)))
+
+ (('append-map ?p ()) => ())
+ (('append-map ?p (?x . ?xs)) => ^(append ,^(,p ,x) ,^(append-map ,p ,xs)))
+
+ (('partition ?p ?xs) => ^(partition* ,p ,xs () ()))
+ (('partition* ?p ()         ?yes ?nos) => `(,yes ,nos))
+ (('partition* ?p (?x . ?xs) ?yes ?nos) => ^(partition** ,^(,p ,x) ,p ,x ,xs ,yes ,nos))
+ (('partition** 'YES ?p ?x ?xs ?yes ?nos) => ^(partition* ,p ,xs (,x . ,yes) ,nos))
+ (('partition** 'NO  ?p ?x ?xs ?yes ?nos) => ^(partition* ,p ,xs ,yes (,x . ,nos)))
+
+ (('member?  _ ()        ) => 'NO)
+ (('member? ?x (?x . _  )) => 'YES)
+ (('member? ?x ( _ . ?xs)) => ^(member? ,x ,xs))
+
+ (('uniq ()) => ())
+ (('uniq (?x . ?xs)) => ^(uniq* ,x ,^(member? ,x ,xs) ,xs))
+ (('uniq*  _ 'YES ?xs) => ^(uniq ,xs))
+ (('uniq* ?x 'NO  ?xs) => `(,x . ,^(uniq ,xs)))
+
+ (('union ?xs ?ys) ^(uniq ,^(append ,xs ,ys)))
+
+
+ ;(--------------------------------------------------------------------)
+ ;(- and now the classical sentential tableaux!                       -)
+
+ (('contradicts? ?p ?q) => ^((contradicts? ,p) ,q))
+ ((('contradicts? ?f     ) ('¬ ?f)) => 'YES)
+ ((('contradicts? ('¬ ?f)) ?f     ) => 'YES)
+ ((('contradicts? _      )  _     ) => 'NO)
+
+ (('has-contradiction? ?fs) => ^(any (ctr* ,fs) ,fs))
+ ((('ctr* ?fs) ?f) => ^(any (contradicts? ,f) ,fs))
+
+ (('literal? $s)      => 'YES)
+ (('literal? ('¬ $s)) => 'YES)
+ (('literal? _)       => 'NO)
+
+ (('NB-succ ('¬ ('¬ ?f)))     => `(,f))
+ (('NB-succ (?f '& ?f*))      => `(,f ,f*))
+ (('NB-succ ('¬ (?f 'v ?f*))) => `((¬ ,f) (¬ ,f*)))
+ (('NB-succ ('¬ (?f '→ ?f*))) => `(,f (¬ ,f*)))
+ (('NB-succ _)                => ())
+
+ (('B-succ ('¬ (?f '& ?f*))) => `(((¬ ,f)) (('¬ ,f*))))
+ (('B-succ (?f 'v ?f*))      => `((,f) (,f*)))
+ (('B-succ (?f '→ ?f*))      => `(((¬ ,f)) (,f*)))
+ (('B-succ (?f '≡ ?f*))      => `((,f ,f*) ((¬ ,f) (¬ ,f*))))
+ (('B-succ ('¬ (?f '≡ ?f*))) => `(((¬ ,f) ,f*) (,f (¬ ,f*))))
+ (('B-succ _)                => ())
+
+ (('branching? ?f) => ^(not ,^(empty? ,^(B-succ ,f))))
+
+ ;(--------------------------------------------------------------------)
+ ;(- ok ready! let's build the tree...                                -)
+
+ (('tableaux ?pend ?lits) => ^(tableaux* ,^(partition literal? ,pend) ,lits))
+
+ (('tableaux* (?lits* ?pend*) ?lits) => lits** <- ^(union ,lits ,lits*)
+                                        ^(tableaux** ,^(has-contradiction? ,lits**) ,lits** ,pend*))
+
+ ;(- arrived at contradiction => no counterexamples, branch cut! -)
+ (('tableaux** 'YES _      _   ) => ())
+
+ (('tableaux** 'NO  ?lits ?pend) => ^(tableaux*** ,^(partition branching? ,pend) ,lits))
+ ;(- no more rules to apply => no way to reduce => a counterexample! -)
+ (('tableaux*** (()         ()  ) ?lits) => `(,lits))
+ ;(- now read the next one first and than this haha -)
+ (('tableaux*** ((?b . ?bs) ()  ) ?lits) => ^(tableaux**** ,^(B-succ ,b) ,bs ,lits))
+ ;(- Priest recommended doing non-branching first -)
+ (('tableaux*** (?bs        ?nbs) ?lits) => nbss <- ^(append-map NB-succ ,nbs)
+                                            pend <- ^(append ,bs ,nbss)
+                                            ^(tableaux ,pend ,lits))
+ ;(- with non-branching we pick first one and follow both subtrees... -)
+ (('tableaux**** (?sucs0 ?sucs1) ?bs ?lits) => pend0 <- ^(append ,bs ,sucs0)
+                                               pend1 <- ^(append ,bs ,sucs1)
+                                               cex0 <- ^(tableaux ,pend0 ,lits)
+                                               cex1 <- ^(tableaux ,pend1 ,lits)
+                                               ^(union ,cex0 ,cex1))
+
+ (('counterexamples 'for ?f 'given ?fs) => ^(tableaux ,^(append ,fs ((¬ ,f))) ()))
+ (('theorem? ?f) ^(empty? ,^(counterexamples for ,f given ())))
+)

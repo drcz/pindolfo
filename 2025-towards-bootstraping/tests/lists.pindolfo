@@ -25,11 +25,9 @@
  (('append-map ?p ()        ) => ())
  (('append-map ?p (?x . ?xs)) => ^(append ,^(,p ,x) ,^(append-map ,p ,xs)))
 
-
  (('lookup    _ 'in ()                    ) => 'NOT-FOUND)
  (('lookup ?key 'in ((?key ?val) .      _)) => val)
  (('lookup ?key 'in (          _ . ?alist)) => ^(lookup ,key in ,alist))
-
 
  (('member?  _ ()        ) => 'NO)
  (('member? ?x (?x . _  )) => 'YES)

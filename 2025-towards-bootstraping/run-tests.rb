@@ -12,6 +12,8 @@ TESTS = [
   ["tests/nat-arithm.pindolfo", "tests/nat-arithm-test.suite"],
   ["tests/merge.pindolfo", "tests/merge-test.suite"],
   ["tests/lists.pindolfo", "tests/lists-test.suite"],
+  ["tests/tableaux-prefix.pindolfo", "tests/tableaux-prefix-test.suite"],
+  ["tests/tableaux-infix.pindolfo", "tests/tableaux-infix-test.suite"],
   ["tests/bnd+reqs.pindolfo", "tests/bnd+reqs-test.suite"],
   ["tests/drc.pindolfo", "tests/drc-test.suite"],
   ["tests/lisp0.pindolfo", "tests/lisp0-test.suite"],
