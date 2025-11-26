@@ -10,6 +10,7 @@ TESTS = [
   ["tests/t23.pindolfo", "tests/t23-test.suite"],
   ["tests/substring.pindolfo", "tests/substring-test.suite"],
   ["tests/nat-arithm.pindolfo", "tests/nat-arithm-test.suite"],
+  ["tests/ack.pindolfo", "tests/ack-test.suite"],
   ["tests/merge.pindolfo", "tests/merge-test.suite"],
   ["tests/lists.pindolfo", "tests/lists-test.suite"],
   ["tests/tableaux-prefix.pindolfo", "tests/tableaux-prefix-test.suite"],
