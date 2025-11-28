@@ -1,0 +1,8 @@
+(map len ((1 2 3) (q w) ())) | (3 2 0)
+((c-exp (z x)) (+ (* 7 8) (- x 1))) | ((CONST 1) (LD (D A)) (SUB) (CONST 8) (CONST 7) (MUL) (ADD))
+((c-exp (z y x)) (cons x (cons x '()))) | ((CONST ()) (LD (D D A)) (CONS) (LD (D D A)) (CONS))
+((c-exp (x y)) (LEAF3 (cons x y) (car y))) | ((LD (D A)) (CAR) (LD (D A)) (LD (A)) (CONS) (CALL LEAF3 2))
+(addr-for x in (q w e x y)) | (D D D A)
+(mk-addr (car x) (q w x)) | (D D A A)
+((c-let (x y)) ((a0 (LEAF1 x y)) (a1 (LEAF2 a0 a0))) a1) | ((LD (D A)) (LD (A)) (CALL LEAF1 2) (ST) (LD (A)) (LD (A)) (CALL LEAF2 2) (ST) (LD (A)) (RET))
+(c-leaf (let* ((a0 (LEAF1 x y)) (a1 (LEAF2 a0 a0))) a1) (z y x)) | ((LD (D A)) (LD (D D A)) (CALL LEAF1 2) (ST) (LD (A)) (LD (A)) (CALL LEAF2 2) (ST) (LD (A)) (RET))

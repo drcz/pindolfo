@@ -47,7 +47,9 @@
  (('step ?D (#n #m . ?R) (('ADD) . ?C) _) =>  `(,D (,(+ n m) . ,R) ,C))
  (('step ?D (#n #m . ?R) (('SUB) . ?C) _) =>  `(,D (,(- n m) . ,R) ,C))
  (('step ?D (#n #m . ?R) (('MUL) . ?C) _) =>  `(,D (,(* n m) . ,R) ,C))
+ (('step ?D (#n #m . ?R) (('DIV) . ?C) _) =>  `(,D (,(/ n m) . ,R) ,C))
  (('step ?D (#n #m . ?R) (('MOD) . ?C) _) =>  `(,D (,(% n m) . ,R) ,C))
+ (('step ?D (#n #m . ?R) (('LT)  . ?C) _) =>  `(,D (,(< n m) . ,R) ,C))
 
  ;(- dispatch stuff --------------------------------------------------------------)
  (('dispatch ('IF ?req ?tb ?fb) 'wrt ?d) => res <- ^(test ,req wrt ,d)
