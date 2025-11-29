@@ -16,9 +16,10 @@
  (('extract ('D . ?addr) 'from (_ . ?e)) => ^(extract ,addr from ,e))
 
  ;(- machine big step ------------------------------------------------------------)
- (('run-program ?expr ?program) => ^(step* (() (,expr) ((CALL 0 1))) ,program))
+ (('run-program ?expr ?program) => ^(step* (() (,expr) ((CALL DISPATCH0 1))) ,program))
 
  (('step* ( _ (?r . _) ())    _) => r)
+ (('step* ('FAIL ?msg)        _) => msg)
  (('step* (?D ?R       ?C) ?prg) => next <- ^(step ,D ,R ,C ,prg)
                                     ^(step* ,next ,prg))
 
@@ -29,6 +30,8 @@
                                                 R* <- ^(drop ,n from ,R)
                                                 C* <- `(,c . ,C)
                                               `(,D* ,R* ,C*))
+
+ (('step ?D (?r . ?R) (('FAIL) . ?C) _) => `(FAIL (NO MATCH FOR ,r)))
 
  (('step (_ . ?D) ?R (('RET) . ?C) _) => `(,D ,R ,C))
 
@@ -61,11 +64,10 @@
  (('dispatch* 'NO    _ ?fb 'wrt ?d) => ^(dispatch ,fb wrt ,d))
 
  ;(- pretty adhoc but the problem is freshly discovered and we might need THIS: -)
- (('test ('and ?t . ?ts) 'wrt ?d) => res <- ^(test ,t wrt ,d)
-                                     ^(aaand-test ,res ,ts ,d))
- (('test ('and) 'wrt ?d) => 'YES)
+ (('test ('and ?t ?t*) 'wrt ?d) => res <- ^(test ,t wrt ,d)
+                                   ^(aaand-test ,res ,t* ,d))
 
- (('aaand-test 'YES ?ts ?d) => ^(test (and . ,ts) wrt ,d))
+ (('aaand-test 'YES ?t* ?d) => ^(test ,t* wrt ,d))
  (('aaand-test 'NO _ _) => 'NO)
 
  (('test (?test ?addr)        'wrt ?d) => ^(,test ,^(extract ,addr from ,d)))
