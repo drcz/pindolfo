@@ -15,8 +15,12 @@
  (('extract ('A . ?addr) 'from (?e . _)) => ^(extract ,addr from ,e))
  (('extract ('D . ?addr) 'from (_ . ?e)) => ^(extract ,addr from ,e))
 
+ (('extract2           () 'from ?e      ) => e)
+ (('extract2 ('A . ?addr) 'from (?e . _)) => ^(extract2 ,addr from ,e))
+ (('extract2 ('D . ?addr) 'from (_ . ?e)) => ^(extract2 ,addr from ,e))
+
  ;(- machine big step ------------------------------------------------------------)
- (('run-program ?expr ?program) => ^(step* (() (,expr) ((CALL DISPATCH0 1))) ,program))
+ (('run-program ?expr ?program) => ^(step* (() (,expr) (((CALL DISPATCH0 1)))) ,program))
 
  (('step* ( _ (?r . _) ())    _) => r)
  (('step* ('FAIL ?msg)        _) => msg)
@@ -24,35 +28,35 @@
                                     ^(step* ,next ,prg))
 
  ;(- machine small step ----------------------------------------------------------)
- (('step ?D ?R (('CALL $id #n) . ?C) ?prg) => args <- ^(take ,n from ,R)
-                                                 c <- ^(lookup ,id in ,prg)
-                                                D* <- `(,args . ,D)
-                                                R* <- ^(drop ,n from ,R)
-                                                C* <- `(,c . ,C)
-                                              `(,D* ,R* ,C*))
+ (('step ?D ?R ((('CALL $id #n) . ?c) . ?C) ?prg) => args <- ^(take ,n from ,R)
+                                                     c* <- ^(lookup ,id in ,prg)
+                                                     R* <- ^(drop ,n from ,R)
+                                                     `((,args . ,D) ,R* (,c* ,c . ,C)))
 
- (('step ?D (?r . ?R) (('FAIL) . ?C) _) => `(FAIL (NO MATCH FOR ,r)))
+ (('step ?D (?r . ?R) ((('FAIL) . _) . _) _) => `(FAIL (NO MATCH FOR ,r)))
 
- (('step (_ . ?D) ?R (('RET) . ?C) _) => `(,D ,R ,C))
+ (('step (_ . ?D) ?R (() . ?C) _) => `(,D ,R ,C))
+ (('step () ?R (() . ?C) _) => `(() ,R ,C))
 
- (('step (?d . ?D) ?R (('DISP ?tree) . ?C) _) =>  c <- ^(dispatch ,tree wrt ,d)
-                                                  `((,d . ,D) ,R (,c . ,C)))
+ (('step (?d . ?D) ?R ((('IF . ?ts)) . ?C) _) => c* <- ^(dispatch (IF . ,ts) wrt ,d)
+                                                 `((,d . ,D) ,R (,c* . ,C)))
 
- (('step (?d . ?D) ?R (('LD ?addr) . ?C) _) =>  e <- ^(extract ,addr from ,d)
-                                                `((,d . ,D) (,e . ,R) ,C))
+ (('step (?d . ?D) ?R ((('LD ?addr) . ?c) . ?C) _) =>  e <- ^(extract ,addr from ,d)
+                                                       `((,d . ,D) (,e . ,R) (,c . ,C)))
 
- (('step (?d . ?D) (?r . ?R) (('ST) . ?C) _) => D* <- `((,r . ,d) . ,D)
-                                                `(,D* ,R ,C))
+ (('step (?d . ?D) (?r . ?R) ((('ST) . ?c) . ?C) _) => `(((,r . ,d) . ,D) ,R (,c . ,C)))
 
- (('step ?D (?h ?t . ?R) (('CONS) . ?C) _) => `(,D ((,h . ,t) . ,R) ,C))
- (('step ?D ((?a . _ ) . ?R) (('CAR) . ?C) _) => `(,D (,a . ,R) ,C))
- (('step ?D (( _ . ?d) . ?R) (('CDR) . ?C) _) => `(,D (,d . ,R) ,C))
- (('step ?D (#n #m . ?R) (('ADD) . ?C) _) =>  `(,D (,(+ n m) . ,R) ,C))
- (('step ?D (#n #m . ?R) (('SUB) . ?C) _) =>  `(,D (,(- n m) . ,R) ,C))
- (('step ?D (#n #m . ?R) (('MUL) . ?C) _) =>  `(,D (,(* n m) . ,R) ,C))
- (('step ?D (#n #m . ?R) (('DIV) . ?C) _) =>  `(,D (,(/ n m) . ,R) ,C))
- (('step ?D (#n #m . ?R) (('MOD) . ?C) _) =>  `(,D (,(% n m) . ,R) ,C))
- (('step ?D (#n #m . ?R) (('LT)  . ?C) _) =>  `(,D (,(< n m) . ,R) ,C))
+ (('step ?D ?R ((('CONST ?e) . ?c) . ?C) _) => `(,D (,e . ,R) (,c . ,C)))
+
+ (('step ?D (?h ?t . ?R) ((('CONS) . ?c) . ?C) _) => `(,D ((,h . ,t) . ,R) (,c . ,C)))
+ (('step ?D ((?a . _ ) . ?R) ((('CAR) . ?c) . ?C) _) => `(,D (,a . ,R) (,c . ,C)))
+ (('step ?D (( _ . ?d) . ?R) ((('CDR) . ?c) . ?C) _) => `(,D (,d . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('ADD) . ?c) . ?C) _) =>  `(,D (,(+ n m) . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('SUB) . ?c) . ?C) _) =>  `(,D (,(- n m) . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('MUL) . ?c) . ?C) _) =>  `(,D (,(* n m) . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('DIV) . ?c) . ?C) _) =>  `(,D (,(/ n m) . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('MOD) . ?c) . ?C) _) =>  `(,D (,(% n m) . ,R) (,c . ,C)))
+ (('step ?D (#n #m . ?R) ((('LT) . ?c)  . ?C) _) =>  `(,D (,(< n m) . ,R) (,c . ,C)))
 
  ;(- dispatch stuff --------------------------------------------------------------)
  (('dispatch ('IF ?req ?tb ?fb) 'wrt ?d) => res <- ^(test ,req wrt ,d)
@@ -70,10 +74,12 @@
  (('aaand-test 'YES ?t* ?d) => ^(test ,t* wrt ,d))
  (('aaand-test 'NO _ _) => 'NO)
 
- (('test (?test ?addr)        'wrt ?d) => ^(,test ,^(extract ,addr from ,d)))
+ (('test (?test ?addr)        'wrt ?d) => ^(,test ,^(extract2 ,addr from ,d)))
 
- (('test (?test ?addr ?addr*) 'wrt ?d) => ^(,test ,^(extract ,addr from ,d)
-                                                  ,^(extract ,addr* from ,d)))
+ (('test ('EQ? #n ?addr)          'wrt ?d) => ^(EQ? ,n ,^(extract2 ,addr from ,d)))
+ (('test ('EQ? ('quote ?e) ?addr) 'wrt ?d) => ^(EQ? ,e ,^(extract2 ,addr from ,d)))
+ (('test ('EQ? ?addr ?addr*)      'wrt ?d) => ^(EQ? ,^(extract2 ,addr from ,d)
+                                                    ,^(extract2 ,addr* from ,d)))
 
  (('NIL? ()) => 'YES)
  (('NIL?  _) => 'NO)

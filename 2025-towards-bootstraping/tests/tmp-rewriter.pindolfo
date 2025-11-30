@@ -25,6 +25,7 @@
 
  ;(---------------------------------------------------------------------)
 
+ (('code-for ('define ($id . ?arglst) ('if . ?stuff))) => `(,id (,^(c-leaf (if . ,stuff) ,arglst))))
  (('code-for ('define ($id . ?arglst) ?body)) => `(,id ,^(c-leaf ,body ,arglst)))
  (('compiled ?program) => ^(map code-for ,program))
 
@@ -49,10 +50,9 @@
  ((('c-exp ?d) ('FAIL ?a)) => ^(apd ,^((c-exp ,d) ,a) ((FAIL))))
  ((('c-exp ?d) ($cid . ?as)) => ^(apd ,^(map-apd (c-exp ,d) ,^(rev ,as)) ((CALL ,cid ,^(len ,as)))))
 
- ((('c-let ?d) () ?fe) => ^(apd ,^((c-exp ,d) ,fe) ((RET))))
+ ((('c-let ?d) () ?fe) => ^((c-exp ,d) ,fe))
  ((('c-let ?d) (($v ?e) . ?as) ?e*) => ce <- ^((c-exp ,d) ,e)
-                                       d* <- `(,v . ,d)
-                                       ^(apd ,ce ,^(apd ((ST)) ,^((c-let ,d*) ,as ,e*))))
+                                       ^(apd ,ce ,^(apd ((ST)) ,^((c-let (,v . ,d)) ,as ,e*))))
 
  ((('c-if ?d) ('if ?t ?b ?b*)) => `(IF ,^((c-test ,d) ,t) ,^(c-leaf ,b ,d) ,^(c-leaf ,b* ,d)))
 
@@ -63,7 +63,7 @@
  ((('c-test ?d) ('symbol? ?a)     ) => `(SYM? ,^(mk-addr ,a ,d)))
  ((('c-test ?d) ('equal? () ?a)           ) => `(NIL? ,^(mk-addr ,a ,d)))
  ((('c-test ?d) ('equal? #n ?a)           ) => `(EQ? ,n ,^(mk-addr ,a ,d)))
- ((('c-test ?d) ('equal? ('quote ?e) ?a)  ) => `(EQ? ,e ,^(mk-addr ,a ,d)))
+ ((('c-test ?d) ('equal? ('quote ?e) ?a)  ) => `(EQ? (quote ,e) ,^(mk-addr ,a ,d)))
  ((('c-test ?d) ('equal? ('cons ?h ?t) ?a)) => ^(mk-complex-test (cons ,h ,t) ,a ,d))
  ((('c-test ?d) ('equal? ?a ?a*)          ) => `(EQ? ,^(mk-addr ,a ,d) ,^(mk-addr ,a* ,d)))
 
