@@ -237,14 +237,18 @@
           (if (or (not (ground? addr/cnstr))
                   (eq? (car cnd) 'EQa?)) ;;; LOL (for now)
               (match `(,cnd ,addr/cnstr)
-                ((('CONS?) ('cons _ _)) #t) ;; TODO is that even possible?
-                ((('NIL?) ('cons _ _)) #f) ;; !!
-                ((('NUM?) ('cons _ _)) #f) ;; !!
-                ((('SYM?) ('cons _ _)) #f) ;; !!
-                ((('ATM?) ('cons _ _)) #f) ;; !!
-                ((('EQ? (? number?)) ('cons _ _)) #f) ;; !!
-                ((('EQ? (? symbol?)) ('cons _ _)) #f) ;; !!
-                ((('EQ? ('quote _)) ('cons _ _)) #f) ;; ?!
+                ((('CONS?) ('cons _ _)) #t)
+                ((('NIL?) ('cons _ _)) #f)
+                ((('NUM?) ('cons _ _)) #f)
+                ((('SYM?) ('cons _ _)) #f)
+                ((('ATM?) ('cons _ _)) #f)
+                ((('EQ? (? number?)) ('cons _ _)) #f)
+                ((('EQ? (? symbol?)) ('cons _ _)) #f)
+                ((('EQ? ('quote _)) ('cons _ _)) #f)
+                ((('NUM?) ((? binop?) _ _)) #t)
+                ((('ATM?) ((? binop?) _ _)) #t)
+                ((('SYM?) ((? binop?) _ _)) #f)
+                ((('NIL?) ((? binop?) _ _)) #f)
                 ((('EQa? addr*) _)
                  `(,addr/cnstr . (EQa? ,(expr-for addr* mexpr)))) ;; !!
                 (_ `(,addr/cnstr . ,cnd))) ;; <- it can't decide now
