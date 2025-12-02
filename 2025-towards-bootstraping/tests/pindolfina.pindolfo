@@ -15,10 +15,6 @@
  (('extract ('A . ?addr) 'from (?e . _)) => ^(extract ,addr from ,e))
  (('extract ('D . ?addr) 'from (_ . ?e)) => ^(extract ,addr from ,e))
 
- (('extract2           () 'from ?e      ) => e)
- (('extract2 ('A . ?addr) 'from (?e . _)) => ^(extract2 ,addr from ,e))
- (('extract2 ('D . ?addr) 'from (_ . ?e)) => ^(extract2 ,addr from ,e))
-
  ;(- machine big step ------------------------------------------------------------)
  (('run-program ?expr ?program) => ^(step* (() (,expr) (((CALL DISPATCH0 1)))) ,program))
 
@@ -67,19 +63,34 @@
  (('dispatch* 'YES ?tb   _ 'wrt ?d) => ^(dispatch ,tb wrt ,d))
  (('dispatch* 'NO    _ ?fb 'wrt ?d) => ^(dispatch ,fb wrt ,d))
 
- ;(- pretty adhoc but the problem is freshly discovered and we might need THIS: -)
+ ;(- pretty adhoc but the problem is freshly discovered and we DO need this: -)
  (('test ('and ?t ?t*) 'wrt ?d) => res <- ^(test ,t wrt ,d)
                                    ^(aaand-test ,res ,t* ,d))
 
  (('aaand-test 'YES ?t* ?d) => ^(test ,t* wrt ,d))
  (('aaand-test 'NO _ _) => 'NO)
 
- (('test (?test ?addr)        'wrt ?d) => ^(,test ,^(extract2 ,addr from ,d)))
+ ;(- even more adhoc but i did't yet come up with anything better...  -)
+ ;(- although if it stays, the computation should be prolly done on R -)
+ ;(- with test code more similar to leaf code ofc. we'll see          -)
+ (('test ('<calc> ('EQ? ?e0 ?e1)) 'wrt ?d) => v0 <- ^(t-calc ,e0 wrt ,d)
+                                              v1 <- ^(t-calc ,e1 wrt ,d)
+                                              ^(EQ? ,v0 ,v1))
 
- (('test ('EQ? #n ?addr)          'wrt ?d) => ^(EQ? ,n ,^(extract2 ,addr from ,d)))
- (('test ('EQ? ('quote ?e) ?addr) 'wrt ?d) => ^(EQ? ,e ,^(extract2 ,addr from ,d)))
- (('test ('EQ? ?addr ?addr*)      'wrt ?d) => ^(EQ? ,^(extract2 ,addr from ,d)
-                                                    ,^(extract2 ,addr* from ,d)))
+ (('t-calc ('+ ?e0 ?e1) 'wrt ?d) => (+ ^(t-calc ,e0 wrt ,d) ^(t-calc ,e1 wrt ,d)))
+ (('t-calc ('- ?e0 ?e1) 'wrt ?d) => (- ^(t-calc ,e0 wrt ,d) ^(t-calc ,e1 wrt ,d)))
+ (('t-calc ('* ?e0 ?e1) 'wrt ?d) => (* ^(t-calc ,e0 wrt ,d) ^(t-calc ,e1 wrt ,d)))
+ (('t-calc ('/ ?e0 ?e1) 'wrt ?d) => (/ ^(t-calc ,e0 wrt ,d) ^(t-calc ,e1 wrt ,d)))
+ (('t-calc ('% ?e0 ?e1) 'wrt ?d) => (% ^(t-calc ,e0 wrt ,d) ^(t-calc ,e1 wrt ,d)))
+ (('t-calc #n 'wrt _) => n)
+ (('t-calc ?addr 'wrt ?d) => ^(extract ,addr from ,d))
+
+ (('test (?test ?addr)        'wrt ?d) => ^(,test ,^(extract ,addr from ,d)))
+
+ (('test ('EQ? #n ?addr)          'wrt ?d) => ^(EQ? ,n ,^(extract ,addr from ,d)))
+ (('test ('EQ? ('quote ?e) ?addr) 'wrt ?d) => ^(EQ? ,e ,^(extract ,addr from ,d)))
+ (('test ('EQ? ?addr ?addr*)      'wrt ?d) => ^(EQ? ,^(extract ,addr from ,d)
+                                                    ,^(extract ,addr* from ,d)))
 
  (('NIL? ()) => 'YES)
  (('NIL?  _) => 'NO)
