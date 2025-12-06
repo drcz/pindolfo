@@ -59,7 +59,7 @@
 
 ;------------------------------------------------------------------
 ;(- an example program - ofc it concatenates lists -)
-(('mk-example) => '((PROC ((NAME xs)
+(('mk-example) => `((PROC ((NAME xs)
                            (NAME ys)
                            (LOOKUP xs)
                            (CONST ())
