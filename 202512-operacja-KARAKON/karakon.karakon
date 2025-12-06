@@ -1,0 +1,51 @@
+(
+;(- i kto teeeraz jest potwooorem? -)
+
+(('karakon ?exp ?prg) => ^(karakon ,exp ,prg ,prg))
+
+(('karakon ?exp ()                       _) => `(NO MATCH FOR ,exp))
+(('karakon ?exp ((?pat ?act) . ?prg*) ?prg) => ^(karakon* ,exp ,^(match? ,pat ,exp) ,act ,prg* ,prg))
+
+(('karakon* ?exp 'NO-MATCH  _  ?prg* ?prg) => ^(karakon ,exp ,prg* ,prg))
+(('karakon*   _    ?bnd   ?act   _   ?prg) => ^(act! ,act ,bnd (K ,prg)))
+
+((('K ?prg) ?exp) => ^(karakon ,exp ,prg))
+
+(('match? ?pat ?exp) => ^(match? ,pat ,exp ()))
+
+(('match? ()          ()         ?bnd) => bnd)
+(('match? '_           _         ?bnd) => bnd)
+(('match? ('quote $e) $e         ?bnd) => bnd)
+(('match? ('sym $sv)  $e         ?bnd) => ^(match-var ,sv ,e ,bnd))
+(('match? ('exp $ev)  ?e         ?bnd) => ^(match-var ,ev ,e ,bnd))
+(('match? (?p . ?ps)  (?e . ?es) ?bnd) => ^(match?* ,^(match? ,p ,e ,bnd) ,ps ,es))
+(('match? _           _          _) => 'NO-MATCH)
+
+(('match?* 'NO-MATCH _  _ ) => 'NO-MATCH)
+(('match?* ?bnd      ?p ?e) => ^(match? ,p ,e ,bnd))
+
+(('match-var $v ?e ?bnd) => ^(match-var* ,^(lookup ,v ,bnd) ,v ,e ,bnd))
+
+(('match-var* ('NONE)    $v ?e ?bnd) => `((,v . ,e) . ,bnd))
+(('match-var* ('JUST ?e) $v ?e ?bnd) => bnd)
+(('match-var* ('JUST _)   _  _   _ ) => 'NO-MATCH)
+
+(('lookup $k (($k . ?v) .   _ )) => `(JUST ,v))
+(('lookup $k (( _ . _ ) . ?bnd)) => ^(lookup ,k ,bnd))
+(('lookup  _ ()                ) => `(NONE))
+
+(('act! ()                _    _ ) => ())
+(('act! ('quote ?e)       _    _ ) => e)
+(('act! ('quasiquote ?qq) ?bnd ?K) => ^(aQQ ,qq ,bnd ,K))
+(('act! ('rec ?a)         ?bnd ?K) => ^(,K ,^(aQQ ,a ,bnd ,K)))
+(('act! $k                ?bnd _ ) => ^(aLU ,k ,^(lookup ,k ,bnd)))
+
+(('aLU $k   ('NONE) ) => `(unbound ,k))
+(('aLU  _ ('JUST ?v)) => v)
+
+(('aQQ ('unquote ?e) ?bnd ?app) => ^(act! ,e ,bnd ,app))
+(('aQQ (?h . ?t)     ?bnd ?app) => hv <- ^(aQQ ,h ,bnd ,app)
+                                   tv <- ^(aQQ ,t ,bnd ,app)
+                                   `(,hv . ,tv))
+(('aQQ ?e             _    _  ) => e)
+)
