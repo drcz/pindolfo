@@ -33,12 +33,13 @@ SE *cdr(SE *p) { assert(p!=NIL);
 
 SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
     SE *tmp, *alhs;
+    //printf("IS_M lhs="); write_SE(lhs); printf(" exp="); write_SE(exp); printf(" bnd="); write_SE(bnd); printf("\n");
     if((lhs==NIL && exp==NIL) || equal_SE(lhs, S__)) return bnd;
     if(lhs==NIL) { put_back_SE(bnd); return S_NO_MATCH; }
     alhs = car(lhs);
     if(equal_SE(alhs, S_QUOTE)) { if(equal_SE(car(cdr(lhs)), exp)) return bnd;
                                   put_back_SE(bnd); return S_NO_MATCH; }
-    if(equal_SE(alhs, S_SYM)) { if(TYPE(exp)!=SYM) { put_back_SE(bnd); return S_NO_MATCH; }
+    if(equal_SE(alhs, S_SYM)) { if(exp==NIL || TYPE(exp)!=SYM) { put_back_SE(bnd); return S_NO_MATCH; }
                                 tmp = lookup(car(cdr(lhs)), bnd);
                                 if(equal_SE(tmp, S_NOT_FOUND)) return mk_cons(mk_cons(CAR(CDR(lhs)), exp), bnd);
                                 if(equal_SE(tmp, exp)) return bnd;
@@ -47,7 +48,8 @@ SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
                                 if(equal_SE(tmp, S_NOT_FOUND)) return mk_cons(mk_cons(CAR(CDR(lhs)), exp), bnd);
                                 if(equal_SE(tmp, exp)) return bnd;
                                 put_back_SE(bnd); return S_NO_MATCH; }
-    if(TYPE(exp)==CONS) { tmp = is_matching(CAR(lhs), CAR(exp), bnd);
+    if(exp!=NIL &&
+       TYPE(exp)==CONS) { tmp = is_matching(CAR(lhs), CAR(exp), bnd);
                           if(equal_SE(tmp, S_NO_MATCH)) return S_NO_MATCH;
                           return is_matching(CDR(lhs), CDR(exp), tmp); }
     put_back_SE(bnd); return S_NO_MATCH;
