@@ -57,6 +57,11 @@ SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
 SE *value_for(SE *, SE *, SE *);
 SE *dispatch(SE *, SE *);
 
+SE *clone(SE *e) { /* it's just a metaphor y'know */
+    if(e!=NIL) REFCOUNT(e)++;
+    return e;
+}
+
 SE *value_qq(SE *qq, SE *bnd, SE *prg) {
     if(qq!=NIL && TYPE(qq)==CONS) {
         if(equal_SE(CAR(qq),S_UNQUOTE)) return value_for(car(cdr(qq)), bnd, prg);
@@ -67,6 +72,7 @@ SE *value_qq(SE *qq, SE *bnd, SE *prg) {
 
 SE *value_for(SE *rhs, SE *bnd, SE *prg) {
     if(rhs==NIL) return NIL;
+    //if(TYPE(rhs)==SYM) return clone(lookup(rhs, bnd)); /// hmmmmmm...
     if(TYPE(rhs)==SYM) return lookup(rhs, bnd);
     if(equal_SE(car(rhs), S_QUOTE)) return car(cdr(rhs));
     if(equal_SE(car(rhs), S_QUASIQUOTE)) return value_qq(car(cdr(rhs)), bnd, prg);
@@ -81,10 +87,11 @@ SE *dispatch(SE *exp, SE *prg) {
                      printf(" <> "); write_SE(lhs); printf("\n");
                      bnd = is_matching(lhs, exp, NIL);
                      printf(" ->b= "); write_SE(bnd); printf("\n");
-                     if(TYPE(bnd)==CONS) { rhs = car(cdr(CAR(p0)));
+                     if(bnd==NIL ||
+                        TYPE(bnd)==CONS) { rhs = car(cdr(CAR(p0)));
                                            if(equal_SE(rhs, S_ARR)) rhs = car(cdr(cdr(CAR(p0))));
                                            put_back_SE(exp);
-                                           res = value_for(rhs, bnd, prg);
+                                           res = clone(value_for(rhs, bnd, prg));
                                            put_back_SE(bnd);
                                            return res; }
                      p0 = cdr(p0); }
@@ -93,17 +100,20 @@ SE *dispatch(SE *exp, SE *prg) {
 }
 
 void print_mem_stat() {
-    printf("--- free cells: %lu -----------------------------------------------\n", get_free_cells_count());
+    SE *ss = get_all_symbols();
+    UL c = 0; for(;ss!=NIL;ss=CDR(ss), c++) ;
+    printf("--- free cells: %lu --- symbols: %lu ---\n", get_free_cells_count(),c);
 }
 
 void main() {
-    SE *exp, *prg;
-    alloc_heap(1024*1024);    
+    SE *exp, *prg, *res;
+    alloc_heap(500*1024);    
     init_consts();
     prg = read_SE(); /// todoooo!!!
     print_mem_stat();
-    printf("\n? "); exp = read_SE(); printf("\n");
-    exp = dispatch(exp, prg);
-    write_SE(exp); printf("\n");
-    print_mem_stat();
+    while(1) { printf("\n? "); exp = read_SE(); printf("\n");
+               res = dispatch(exp, prg);
+               write_SE(res); printf("\n");
+               put_back_SE(res);
+               print_mem_stat(); }
 }

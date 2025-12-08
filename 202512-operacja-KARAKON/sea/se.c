@@ -33,7 +33,7 @@ void put_back_SE(SE *s) {
     if(s==NIL) return;
     if(REFCOUNT(s)>0) REFCOUNT(s)--;
     if(REFCOUNT(s)==0) {
-        if(TYPE(s) == CONS) { put_back_SE(CAR(s)); /* callstack happy? */
+        if(TYPE(s) == CONS) { put_back_SE(CAR(s));
                               put_back_SE(CDR(s)); }
         TYPE(s) = CONS; CAR(s) = NIL; CDR(s) = the_free_cells;
         the_free_cells = s;
