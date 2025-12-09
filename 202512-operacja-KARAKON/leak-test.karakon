@@ -1,0 +1,12 @@
+(
+ ;(only match and valqq)
+ (('test $a $b) => `(,a ,a ,b ,b))
+ ;(only match and val/rec)
+ (('dupa $c) => ^(test ,c qq))
+ ;(only match and val/lu)
+ (('zupa $c) => c)
+ ;(match and valqq and val/rec)
+ (('test2 $a $b) => `(,^(zupa ,a) ,^(zupa ,b)))
+ ;(nested recs)
+ (('test3 $a) => ^(dupa ,^(zupa ,a)))
+)
