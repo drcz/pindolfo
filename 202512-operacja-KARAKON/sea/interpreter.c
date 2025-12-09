@@ -6,6 +6,8 @@
 SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
 SE *S_NO_MATCH, *S_NOT_FOUND;
 
+SE *program;
+
 void init_consts() {
 	S__ = mk_sym("_");
 	S_SYM = mk_sym("sym");
@@ -56,44 +58,43 @@ SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
 }
 
 
-SE *value_for(SE *, SE *, SE *);
-SE *dispatch(SE *, SE *);
+SE *value_for(SE *, SE *);
+SE *dispatch(SE *);
 
 SE *clone(SE *e) { /* it's just a metaphor y'know */
     if(e!=NIL) REFCOUNT(e)++;
     return e;
 }
 
-SE *value_qq(SE *qq, SE *bnd, SE *prg) {
+SE *value_qq(SE *qq, SE *bnd) {
     if(qq!=NIL && TYPE(qq)==CONS) {
-        if(equal_SE(CAR(qq),S_UNQUOTE)) return value_for(car(cdr(qq)), bnd, prg);
-        return mk_cons(value_qq(CAR(qq), bnd, prg), value_qq(CDR(qq), bnd, prg));
+        if(equal_SE(CAR(qq),S_UNQUOTE)) return value_for(car(cdr(qq)), bnd);
+        return mk_cons(value_qq(CAR(qq), bnd), value_qq(CDR(qq), bnd));
     }
     return qq;
 }
 
-SE *value_for(SE *rhs, SE *bnd, SE *prg) {
+SE *value_for(SE *rhs, SE *bnd) {
     if(rhs==NIL) return NIL;
-    //if(TYPE(rhs)==SYM) return clone(lookup(rhs, bnd)); /// hmmmmmm...
-    if(TYPE(rhs)==SYM) return lookup(rhs, bnd);
+    if(TYPE(rhs)==SYM) return clone(lookup(rhs, bnd));
     if(equal_SE(car(rhs), S_QUOTE)) return car(cdr(rhs));
-    if(equal_SE(car(rhs), S_QUASIQUOTE)) return value_qq(car(cdr(rhs)), bnd, prg);
-    if(equal_SE(car(rhs), S_REC)) return dispatch(value_qq(car(cdr(rhs)), bnd, prg), prg);
+    if(equal_SE(car(rhs), S_QUASIQUOTE)) return value_qq(car(cdr(rhs)), bnd);
+    if(equal_SE(car(rhs), S_REC)) return clone(dispatch(value_qq(car(cdr(rhs)), bnd)));
 }
 
-SE *dispatch(SE *exp, SE *prg) {
-    SE *p0 = prg,*lhs,*rhs,*bnd,*res;
+SE *dispatch(SE *exp) {
+    SE *p0 = program,*lhs,*rhs,*bnd,*res;
     printf("dsp: "); write_SE(exp); printf("\n");
     while(p0!=NIL) { assert(TYPE(p0)==CONS);
                      lhs = car(CAR(p0));
-                     printf(" <> "); write_SE(lhs); printf("\n");
                      bnd = is_matching(lhs, exp, NIL);
-                     printf(" ->b= "); write_SE(bnd); printf("\n");
                      if(bnd==NIL ||
-                        TYPE(bnd)==CONS) { rhs = car(cdr(CAR(p0)));
+                        TYPE(bnd)==CONS) { printf(" <m!> "); write_SE(lhs); printf("\n");
+                                           printf(" ~b~> "); write_SE(bnd); printf("\n");
+                                           rhs = car(cdr(CAR(p0)));
                                            if(equal_SE(rhs, S_ARR)) rhs = car(cdr(cdr(CAR(p0))));
                                            put_back_SE(exp);
-                                           res = clone(value_for(rhs, bnd, prg));
+                                           res = value_for(rhs, bnd);
                                            put_back_SE(bnd);
                                            return res; }
                      p0 = cdr(p0); }
@@ -108,13 +109,13 @@ void print_mem_stat() {
 }
 
 void main() {
-    SE *exp, *prg, *res;
+    SE *exp, *res;
     alloc_heap(500*1024);    
     init_consts();
-    prg = read_SE(); /// todoooo!!!
+    program = read_SE(); /// todoooo!!!
     print_mem_stat();
     while(1) { printf("\n? "); exp = read_SE(); printf("\n");
-               res = dispatch(exp, prg);
+               res = dispatch(exp);
                write_SE(res); printf("\n");
                put_back_SE(res);
                print_mem_stat(); }
