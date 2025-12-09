@@ -76,10 +76,10 @@ SE *value_qq(SE *qq, SE *bnd) {
 
 SE *value_for(SE *rhs, SE *bnd) {
     if(rhs==NIL) return NIL;
-    if(TYPE(rhs)==SYM) return clone(lookup(rhs, bnd));
+    if(TYPE(rhs)==SYM) return lookup(rhs, bnd);
     if(equal_SE(car(rhs), S_QUOTE)) return car(cdr(rhs));
     if(equal_SE(car(rhs), S_QUASIQUOTE)) return value_qq(car(cdr(rhs)), bnd);
-    if(equal_SE(car(rhs), S_REC)) return clone(dispatch(value_qq(car(cdr(rhs)), bnd)));
+    if(equal_SE(car(rhs), S_REC)) return dispatch(value_qq(car(cdr(rhs)), bnd));
 }
 
 SE *dispatch(SE *exp) {
@@ -94,7 +94,7 @@ SE *dispatch(SE *exp) {
                                            rhs = car(cdr(CAR(p0)));
                                            if(equal_SE(rhs, S_ARR)) rhs = car(cdr(cdr(CAR(p0))));
                                            put_back_SE(exp);
-                                           res = value_for(rhs, bnd);
+                                           res = clone(value_for(rhs, bnd)); /* this sucks */
                                            put_back_SE(bnd);
                                            return res; }
                      p0 = cdr(p0); }
@@ -110,7 +110,7 @@ void print_mem_stat() {
 
 void main() {
     SE *exp, *res;
-    alloc_heap(500*1024);    
+    alloc_heap(500*1024); 
     init_consts();
     program = read_SE(); /// todoooo!!!
     print_mem_stat();

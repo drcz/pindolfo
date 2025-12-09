@@ -1,0 +1,75 @@
+(;(abstract machine DRC from my b.sc thesis - this time in direct style)
+
+;( -- ofc cats are bosses -- )
+(('cat ()         ?ys) => ys)
+(('cat (?x . ?xs) ?ys) => `(,x . ,^(cat ,xs ,ys)))
+
+;( -- operations on dictionary (the D register) -- )
+(('name $k ?v ?dict) => `((,k . ,v) . ,dict))
+
+(('forget $k ()                ) => ())
+(('forget $k (($k . _) . ?dict)) => dict)
+(('forget $k (       _ . ?dict)) => ^(forget ,k ,dict))
+
+(('lookup $k (($k . ?v) . _    )) => v)
+(('lookup $k (        _ . ?dict)) => ^(lookup ,k ,dict))
+
+;( -- the machine proper starts here -- )
+(('run-drc ?program ?inputs) => ^(step* () ,inputs ,program))
+
+;(- STORE - operating on D -)
+(('step* ?D (?e . ?R) (  ('NAME $n) . ?C)) => ^(step* ,^(name ,n ,e ,D) ,R ,C))
+(('step* ?D    ?R     (('FORGET $n) . ?C)) => ^(step* ,^(forget ,n ,D)  ,R ,C))
+(('step* ?D    ?R     (('LOOKUP $n) . ?C)) => ^(step* ,D (,^(lookup ,n ,D) . ,R) ,C))
+
+;(- CONSTANTS AND OPS - operating on R -)
+(('step* ?D ?R (('CONST ?e) . ?C)) => ^(step* ,D (,e . ,R) ,C))
+(('step* ?D ?R ( ('PROC ?p) . ?C)) => ^(step* ,D (,p . ,R) ,C))
+
+(('step* ?D ( ?h ?t . ?R) (('CONS) . ?C)) => ^(step* ,D ((,h . ,t) . ,R) ,C))
+
+(('step* ?D ((?h . ?t) . ?R) (('CAR) . ?C)) => ^(step* ,D (,h . ,R) ,C))
+(('step* ?D ((?h . ?t) . ?R) (('CDR) . ?C)) => ^(step* ,D (,t . ,R) ,C))
+
+(('step* ?D (?e ?e . ?R) (('EQ?) . ?C)) => ^(step* ,D (T  . ,R) ,C))
+(('step* ?D ( _  _ . ?R) (('EQ?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+
+(('step* ?D ( $s . ?R) (('SYM?) . ?C)) => ^(step* ,D ( T . ,R) ,C))
+(('step* ?D (  _ . ?R) (('SYM?) . ?C)) => ^(step* ,D (() . ,R) ,C))
+
+;(- CONTROL FLOW - operating on C -)
+(('step* ?D (() . ?R) (('SELECT ?p ?p*) . ?C)) => ^(step* ,D ,R ,^(cat ,p* ,C)))
+(('step* ?D (_  . ?R) (('SELECT ?p ?p*) . ?C)) => ^(step* ,D ,R ,^(cat ,p ,C)))
+
+(('step* ?D (?p . ?R) (('APPLY) . ?C)) => ^(step* ,D ,R ,^(cat ,p ,C)))
+
+;(- halting? not a problem! -)
+(('step* ?D (?e . ?R) ()) => e)
+
+
+;------------------------------------------------------------------
+;(- an example program - ofc it concatenates lists -)
+(('mk-example) => `((PROC ((NAME xs)
+                           (NAME ys)
+                           (LOOKUP xs)
+                           (CONST ())
+                           (EQ?)
+                           (SELECT ((LOOKUP ys))
+                                   ((LOOKUP ys)
+                                    (LOOKUP xs)
+                                    (CDR)
+                                    (LOOKUP apd)
+                                    (APPLY)
+                                    (LOOKUP xs)
+                                    (CAR)
+                                    (CONS)))
+                           (FORGET ys)
+                           (FORGET xs)))
+                    (NAME apd)
+                    (LOOKUP apd)
+                    (APPLY)
+                    (LOOKUP apd)
+                    (APPLY)))
+
+ (('dbl-apd-test ?xs ?ys ?zs) => ^(run-drc ,^(mk-example) (,xs ,ys ,zs)))
+)
