@@ -53,7 +53,8 @@
 ((('step ?prg) (?C        ?E (('K-qq ((?u ?a) . ?us) ?qq) . ?K))) => `(,C ,E (,u (K-qq ((,a) . ,us) ,qq) . ,K)))
 ((('step ?prg) ((?c . ?C) ?E (('K-qq ((?a)    . ?us) ?qq) . ?K))) => `(,C ,E ((K-qq ,us ,^(subst ,c at ,a in ,qq)) . ,K)))
 
-((('step ?prg) ((?c . ?C) ?E (('K-rec) . ?K))) => ^(M-step ,prg (,C ,E ,K) ,c))
+((('step ?prg) ((?c . ?C)       ?E (('K-rec)     . ?K))) => ^(M-step ,prg (,C ,E ,K) ,c))
+((('step ?prg) (?C        (_ . ?E) (('K-clean-E) . ?K))) => `(,C ,E ,K))
 
 (('LU-step _          $var ('NONE)   ) => `(HALT (UNBOUND VARIABLE ,var)))
 (('LU-step (?C ?E ?K) _    ('JUST ?e)) => `((,e . ,C) ,E ,K))
@@ -63,7 +64,7 @@
 (('M-step ((?lhs ?rhs)     . ?prg) ?CEK ?exp) => ^(M-step* ,prg ,rhs ,CEK ,^(match? ,lhs ,exp) ,exp)) ;(- hehe -)
 
 (('M-step* ?prg _    ?CEK       'NO-MATCH ?exp) => ^(M-step ,prg ,CEK ,exp))
-(('M-step* ?prg ?rhs (?C ?E ?K) ?bnd      _   ) => `(,C (,bnd . ,E) (,rhs . ,K)))
+(('M-step* ?prg ?rhs (?C ?E ?K) ?bnd      _   ) => `(,C (,bnd . ,E) (,rhs (K-clean-E) . ,K)))
 
 ((('run* ?step) ('HALT ?msg)) => msg)
 ((('run* ?step) ?CEK        ) => ^((run* ,step) ,^(,step ,CEK)))
