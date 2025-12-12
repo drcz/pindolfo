@@ -22,6 +22,39 @@ void init_consts() {
 }
 
 
+SE *clone(SE *e) { /* it's just a metaphor y'know, nobody gets cloned */
+    if(e!=NIL && TYPE(e)==CONS) REFCOUNT(e)++;
+    return e;
+}
+
+void free_expr(SE *expr, SE *bnd) {
+    /* here we want to free all the pieces of expr which are not referenced */
+    /* inside the binding, so we first mark them by raising their REFCOUNTs */
+    SE *tmp = bnd;
+    while(tmp!=NIL) { clone(CDR(CAR(tmp))); tmp = CDR(tmp); }
+    /* and then freeing everything with REFCOUNT <1 */
+    free_SE(expr);
+}
+
+void free_bnd(SE *bnd) {
+    /* we don't want to touch its content since keys are from program and */
+    /* vals from expr -- we just want to free the conses that hold them!  */
+    SE *tmp;
+    while(bnd!=NIL) { tmp = bnd; bnd = CDR(bnd);
+                      put_back_SE(CAR(tmp)); /* key-val cons */
+                      put_back_SE(tmp); } /* cons holding the above */
+}
+
+void deep_free_bnd(SE *bnd) {
+    /* and this one removes vals with REFCOUNT<1 too */
+    SE *tmp;
+    while(bnd!=NIL) { tmp = bnd; bnd = CDR(bnd);
+                      free_SE(CDR(CAR(tmp))); /* val */
+                      put_back_SE(CAR(tmp)); /* key-val cons */
+                      put_back_SE(tmp); } /* cons holding the above */
+}
+
+
 SE *lookup(SE *k, SE *bnd) {
     while(bnd!=NIL) { if(equal_SE(CAR(CAR(bnd)), k)) return CDR(CAR(bnd));
                       bnd = CDR(bnd); }
@@ -33,38 +66,33 @@ SE *car(SE *p) { assert(p!=NIL);
 SE *cdr(SE *p) { assert(p!=NIL);
                  assert(TYPE(p)==CONS); return CDR(p); }
 
+
 SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
     SE *tmp, *alhs;
-    //printf("IS_M lhs="); write_SE(lhs); printf(" exp="); write_SE(exp); printf(" bnd="); write_SE(bnd); printf("\n");
     if((lhs==NIL && exp==NIL) || equal_SE(lhs, S__)) return bnd;
-    if(lhs==NIL) { put_back_SE(bnd); return S_NO_MATCH; }
+    if(lhs==NIL) { free_bnd(bnd); return S_NO_MATCH; }
     alhs = car(lhs);
     if(equal_SE(alhs, S_QUOTE)) { if(equal_SE(car(cdr(lhs)), exp)) return bnd;
-                                  put_back_SE(bnd); return S_NO_MATCH; }
-    if(equal_SE(alhs, S_SYM)) { if(exp==NIL || TYPE(exp)!=SYM) { put_back_SE(bnd); return S_NO_MATCH; }
+                                  free_bnd(bnd); return S_NO_MATCH; }
+    if(equal_SE(alhs, S_SYM)) { if(exp==NIL || TYPE(exp)!=SYM) { free_bnd(bnd); return S_NO_MATCH; }
                                 tmp = lookup(car(cdr(lhs)), bnd);
                                 if(equal_SE(tmp, S_NOT_FOUND)) return mk_cons(mk_cons(CAR(CDR(lhs)), exp), bnd);
                                 if(equal_SE(tmp, exp)) return bnd;
-                                put_back_SE(bnd); return S_NO_MATCH; }
+                                free_bnd(bnd); return S_NO_MATCH; }
     if(equal_SE(alhs, S_EXP)) { tmp = lookup(car(cdr(lhs)), bnd);
                                 if(equal_SE(tmp, S_NOT_FOUND)) return mk_cons(mk_cons(CAR(CDR(lhs)), exp), bnd);
                                 if(equal_SE(tmp, exp)) return bnd;
-                                put_back_SE(bnd); return S_NO_MATCH; }
+                                free_bnd(bnd); return S_NO_MATCH; }
     if(exp!=NIL &&
        TYPE(exp)==CONS) { tmp = is_matching(CAR(lhs), CAR(exp), bnd);
                           if(equal_SE(tmp, S_NO_MATCH)) return S_NO_MATCH;
                           return is_matching(CDR(lhs), CDR(exp), tmp); }
-    put_back_SE(bnd); return S_NO_MATCH;
+    free_bnd(bnd); return S_NO_MATCH;
 }
 
 
 SE *value_for(SE *, SE *);
 SE *dispatch(SE *);
-
-SE *clone(SE *e) { /* it's just a metaphor y'know */
-    if(e!=NIL) REFCOUNT(e)++;
-    return e;
-}
 
 SE *value_qq(SE *qq, SE *bnd) {
     if(qq!=NIL && TYPE(qq)==CONS) {
@@ -75,9 +103,10 @@ SE *value_qq(SE *qq, SE *bnd) {
 }
 
 SE *value_for(SE *rhs, SE *bnd) {
+    SE *val = NIL;
     if(rhs==NIL) return NIL;
-    if(TYPE(rhs)==SYM) return lookup(rhs, bnd);
-    if(equal_SE(car(rhs), S_QUOTE)) return car(cdr(rhs));
+    if(TYPE(rhs)==SYM) return clone(lookup(rhs, bnd));
+    if(equal_SE(car(rhs), S_QUOTE)) return clone(car(cdr(rhs)));
     if(equal_SE(car(rhs), S_QUASIQUOTE)) return value_qq(car(cdr(rhs)), bnd);
     if(equal_SE(car(rhs), S_REC)) return dispatch(value_qq(car(cdr(rhs)), bnd));
 }
@@ -89,17 +118,17 @@ SE *dispatch(SE *exp) {
                      lhs = car(CAR(p0));
                      bnd = is_matching(lhs, exp, NIL);
                      if(bnd==NIL ||
-                        TYPE(bnd)==CONS) { printf(" <m!> "); write_SE(lhs); printf("\n");
-                                           printf(" ~b~> "); write_SE(bnd); printf("\n");
+                        TYPE(bnd)==CONS) { //printf(" <m!> "); write_SE(lhs); printf("\n");
+                                           //printf(" ~b~> "); write_SE(bnd); printf("\n");
+                                           free_expr(exp, bnd);
                                            rhs = car(cdr(CAR(p0)));
                                            if(equal_SE(rhs, S_ARR)) rhs = car(cdr(cdr(CAR(p0))));
-                                           put_back_SE(exp);
-                                           res = clone(value_for(rhs, bnd)); /* this sucks */
-                                           put_back_SE(bnd);
+                                           res = value_for(rhs, bnd);
+                                           deep_free_bnd(bnd);
                                            return res; }
                      p0 = cdr(p0); }
     printf("NO MATCH FOR "); write_SE(exp); printf("\n");
-    put_back_SE(exp); return NIL;
+    free_expr(exp,NIL); return NIL; /* actually it should halt, no? */
 }
 
 void print_mem_stat() {
@@ -113,10 +142,12 @@ void main() {
     alloc_heap(500*1024); 
     init_consts();
     program = read_SE(); /// todoooo!!!
+    bookmark_symbols();
     print_mem_stat();
     while(1) { printf("\n? "); exp = read_SE(); printf("\n");
                res = dispatch(exp);
                write_SE(res); printf("\n");
-               put_back_SE(res);
+               free_SE(res);
+               free_symbols_up_to_bookmark();
                print_mem_stat(); }
 }

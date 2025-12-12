@@ -98,10 +98,8 @@ SE *get_cdr() {
 
 SE *read_SE() { get_token(); return get_SE(); }
 
-
 void write_cdr(SE *);
 
-/*
 void write_SE(SE *s) {
     if(s==NIL) { printf("()"); return; }
     switch(TYPE(s)) {
@@ -113,20 +111,6 @@ void write_SE(SE *s) {
     }
     assert(0==1);
 }
-*/
-
-void write_SE(SE *s) {
-    if(s==NIL) { printf("()"); return; }
-    switch(TYPE(s)) {
-    case SYM: printf("%s{%d}", SYMVAL(s),REFCOUNT(s)); return;
-    case CONS: printf("({%d}",REFCOUNT(s));
-               write_SE(CAR(s));
-               write_cdr(CDR(s));
-               return;
-    }
-    assert(0==1);
-}
-
 
 void write_cdr(SE *s) {
     while(s!=NIL) { if(TYPE(s)!=CONS) { printf(" . ");

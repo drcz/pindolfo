@@ -8,6 +8,7 @@ UL the_heap_size = 0;
 SE *the_heap = NIL;
 SE *the_free_cells = NIL;
 SE *the_symbols = NIL;
+SE *symbols_bookmark = NIL;
 
 void alloc_heap(UL heap_size) {
     unsigned int i;
@@ -31,13 +32,10 @@ SE *pick_up_SE() {
 
 void put_back_SE(SE *s) {
     if(s==NIL) return;
-    if(REFCOUNT(s)>0) REFCOUNT(s)--;
-    if(REFCOUNT(s)==0) {
-        if(TYPE(s) == CONS) { put_back_SE(CAR(s));
-                              put_back_SE(CDR(s)); }
-        TYPE(s) = CONS; CAR(s) = NIL; CDR(s) = the_free_cells;
-        the_free_cells = s;
-    }
+    if(TYPE(s)==SYM) free(SYMVAL(s));
+    REFCOUNT(s) = 0; TYPE(s) = CONS;
+    CAR(s) = NIL; CDR(s) = the_free_cells;
+    the_free_cells = s;
 }
 
 UL get_heap_size() { return the_heap_size; }
@@ -51,16 +49,33 @@ UL get_free_cells_count() {
 
 SE *get_all_symbols() { return the_symbols; }
 
+void bookmark_symbols() { symbols_bookmark = the_symbols; }
+
+void free_symbols_up_to_bookmark() {
+    SE *tmp;
+    while(the_symbols!=NIL &&
+          the_symbols!=symbols_bookmark) { assert(TYPE(the_symbols)==CONS); /* SANITY */
+                                           tmp = the_symbols; the_symbols = CDR(the_symbols);
+                                           put_back_SE(CAR(tmp)); /* the symbol */
+                                           put_back_SE(tmp); } /* cons that held it */
+}
+
+void free_SE(SE *expr) {
+    /* recursive dereferencing and putback of any part with REFCOUNT <1 */
+    if(expr==NIL || TYPE(expr)==SYM) return;
+    if(REFCOUNT(expr)>0) { REFCOUNT(expr)--; return; }
+    free_SE(CAR(expr)); free_SE(CDR(expr));
+    put_back_SE(expr);
+}
+
 SE *mk_cons(SE *car, SE *cdr) {
     SE *s = pick_up_SE();
     assert(TYPE(s)==CONS && REFCOUNT(s)==0); /* SANITY */
     CAR(s) = car; CDR(s) = cdr;
-    if(car!=NIL) REFCOUNT(car)++;
-    if(cdr!=NIL) REFCOUNT(cdr)++;
     return s;
 }
 
-SE *mk_sym(const char *str) {
+SE *mk_sym(char *str) {
     SE *s;
     for(s=the_symbols; s!=NIL; s=CDR(s))
         if(strcmp(SYMVAL(CAR(s)), str)==0) return CAR(s);
@@ -69,7 +84,6 @@ SE *mk_sym(const char *str) {
     assert(REFCOUNT(s)==0); /* SANITY */
     TYPE(s) = SYM; SYMVAL(s) = str;
     the_symbols = mk_cons(s, the_symbols);
-    /* TODO: don't we want to have REFCOUNT(the_symbols)==1 too?? */
     return s;
 }
 
