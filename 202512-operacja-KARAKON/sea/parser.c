@@ -15,6 +15,8 @@ typedef enum { T_SYM,
                T_SYM_A, T_EXP_A, T_REC,
                T_COMMENT, T_EOF } TOKtype;
 
+unsigned ignore_mode = 0;
+
 struct {  TOKtype type;
     char buffer[TOK_BUFFER_SIZE+1];
 } cur_token;
@@ -26,7 +28,7 @@ void get_token() {
     int c, i = 0;
     do { c = getc(f_input); } while( isspace(c) );
     switch(c) {
-    case EOF: cur_token.type = T_EOF; return; /* TODO! */
+    case EOF: cur_token.type = T_EOF; return;
     case '\'': cur_token.type = T_QUOTE; return;
     case '`': cur_token.type = T_QUASIQUOTE; return;
     case ',': cur_token.type = T_UNQUOTE; return;
@@ -65,16 +67,16 @@ SE *get_cdr();
 SE *get_SE() {
     SE *h;
     switch(cur_token.type) {
-    case T_EOF: return NIL; /* TODO: sure? */
-    case T_SYM: return mk_sym(strdup(cur_token.buffer));
+    case T_EOF: return mk_sym("(EOF)"); /* this way it can't be typed \o/ */
+    case T_SYM: return (ignore_mode==0 ? mk_sym(strdup(cur_token.buffer)) : NIL);
     case T_LPAR: get_token(); return get_cdr();
     case T_QUOTE: case T_QUASIQUOTE: case T_UNQUOTE:
     case T_SYM_A: case T_EXP_A:
     case T_REC: h = head_for(cur_token.type);
                 get_token();
                 return mk_cons(h, mk_cons(get_SE(), NIL));
-    case T_COMMENT: get_token(); get_SE(); /* commented expr, ignore */
-                    get_token(); return get_SE();
+    case T_COMMENT: ignore_mode = 1; get_token(); get_SE(); /* commented expr, ignore */
+                    ignore_mode = 0; get_token(); return get_SE();
     }
     assert(0==1); /* notreached */
 }
@@ -84,8 +86,8 @@ SE *get_cdr() {
     if(cur_token.type==T_RPAR) return NIL;
     car = get_SE();
     get_token();
-    if(cur_token.type==T_COMMENT) { get_token(); get_SE();
-                                    get_token(); } /* not elegant but... */
+    if(cur_token.type==T_COMMENT) { ignore_mode = 1; get_token(); get_SE();
+                                    ignore_mode = 0; get_token(); } /* LOL */
     if(cur_token.type==T_RPAR) return mk_cons(car,NIL);
     if(cur_token.type==T_DOT) {
         get_token();

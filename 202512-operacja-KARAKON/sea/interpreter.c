@@ -7,7 +7,7 @@
 #include "parser.h"
 
 SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
-SE *S_NO_MATCH, *S_NOT_FOUND;
+SE *S_NO_MATCH, *S_NOT_FOUND, *S_EOF;
 
 typedef enum {OFF, ONLY_EXPRS, ALL} DbgLevel;
 DbgLevel dbg_level;
@@ -26,6 +26,7 @@ void init_consts() {
     S_ARR = mk_sym("=>");
     S_NO_MATCH = mk_sym("NO-MATCH");
     S_NOT_FOUND = mk_sym("NOT-FOUND");
+    S_EOF = mk_sym("(EOF)");
 }
 
 
@@ -183,6 +184,7 @@ int main(int argc, char **argv) {
     bookmark_symbols();
     print_mem_stat();
     while(1) { printf("\n? "); exp = read_SE(); printf("\n");
+               if(equal_SE(exp, S_EOF)) { printf("Auf wiedersehen!\n"); return 0; }
                res = dispatch(exp);
                write_SE(res); printf("\n");
                free_SE(res);
