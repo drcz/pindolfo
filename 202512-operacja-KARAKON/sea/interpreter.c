@@ -1,24 +1,31 @@
 #include <assert.h>
+#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
+
 #include "se.h"
 #include "parser.h"
 
 SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
 SE *S_NO_MATCH, *S_NOT_FOUND;
 
+typedef enum {OFF, ONLY_EXPRS, ALL} DbgLevel;
+DbgLevel dbg_level;
 SE *program;
 
+#define DEFAULT_HEAPSIZE 64*1024
+
 void init_consts() {
-	S__ = mk_sym("_");
-	S_SYM = mk_sym("sym");
-	S_EXP = mk_sym("exp");
-	S_QUOTE = mk_sym("quote");
-	S_QUASIQUOTE = mk_sym("quasiquote");
-	S_UNQUOTE = mk_sym("unquote");
-	S_REC = mk_sym("rec");
+    S__ = mk_sym("_");
+    S_SYM = mk_sym("sym");
+    S_EXP = mk_sym("exp");
+    S_QUOTE = mk_sym("quote");
+    S_QUASIQUOTE = mk_sym("quasiquote");
+    S_UNQUOTE = mk_sym("unquote");
+    S_REC = mk_sym("rec");
     S_ARR = mk_sym("=>");
-	S_NO_MATCH = mk_sym("NO-MATCH");
-	S_NOT_FOUND = mk_sym("NOT-FOUND");
+    S_NO_MATCH = mk_sym("NO-MATCH");
+    S_NOT_FOUND = mk_sym("NOT-FOUND");
 }
 
 
@@ -113,13 +120,15 @@ SE *value_for(SE *rhs, SE *bnd) {
 
 SE *dispatch(SE *exp) {
     SE *p0 = program,*lhs,*rhs,*bnd,*res;
-    printf("dsp: "); write_SE(exp); printf("\n");
+    if(dbg_level!=OFF) { printf("<e> "); write_SE(exp); printf("\n"); }
     while(p0!=NIL) { assert(TYPE(p0)==CONS);
                      lhs = car(CAR(p0));
                      bnd = is_matching(lhs, exp, NIL);
                      if(bnd==NIL ||
-                        TYPE(bnd)==CONS) { //printf(" <m!> "); write_SE(lhs); printf("\n");
-                                           //printf(" ~b~> "); write_SE(bnd); printf("\n");
+                        TYPE(bnd)==CONS) { if(dbg_level==ALL) {
+                                             printf(" <m> "); write_SE(lhs); printf("\n");
+                                             printf(" ~b> "); write_SE(bnd); printf("\n");
+                                           }
                                            free_expr(exp, bnd);
                                            rhs = car(cdr(CAR(p0)));
                                            if(equal_SE(rhs, S_ARR)) rhs = car(cdr(cdr(CAR(p0))));
@@ -137,11 +146,40 @@ void print_mem_stat() {
     printf("--- free cells: %lu --- symbols: %lu ---\n", get_free_cells_count(),c);
 }
 
-void main() {
-    SE *exp, *res;
-    alloc_heap(500*1024); 
+void help(char *myname) {
+    printf("usage:\n%s [options] <source file>\n", myname);
+    printf("options:\n");
+    printf(" -h \t\t print this info and quit\n");
+    printf(" -s <uint> \t set heapsize in cells (default %lu)\n", DEFAULT_HEAPSIZE);
+    printf(" -d [012]\t set debug level (default 0):\n");
+    printf("\t 0 \t off\n");
+    printf("\t 1 \t only expressions to be matched\n");
+    printf("\t 2 \t all (expressions, matched pattern and binding)\n");
+    printf("Auf wiedersehen!\n");
+}
+
+int main(int argc, char **argv) {
+    SE *exp, *res; int c; FILE *f_src;
+    UL heap_size = DEFAULT_HEAPSIZE;
+    dbg_level = OFF;
+    while((c = getopt(argc, argv, "s:d:h"))!=-1) {
+        switch(c) {
+        case 'h': help(argv[0]); return 0;
+        case 's': heap_size = atol(optarg); break;
+        case 'd': switch(optarg[0]) {
+                  case '0': dbg_level = OFF; break;
+                  case '1': dbg_level = ONLY_EXPRS; break;
+                  case '2': dbg_level = ALL; break;
+                  default: printf("unknown debug level %c!\n", optarg[0]); return 1;
+                  } break;
+        default: printf("unknown option %c!\n", c); return 1;
+        }
+    }
+    alloc_heap(heap_size); printf("allocated %lu cells.\n", heap_size);
     init_consts();
-    program = read_SE(); /// todoooo!!!
+    if(f_src = fopen(argv[optind],"r")) { set_input(f_src); program = read_SE(); set_input(stdin);
+                                          printf("loaded source file %s.\n", argv[optind]); }
+    else { printf("Could not open file %s.\n", argv[optind]); return 1; }
     bookmark_symbols();
     print_mem_stat();
     while(1) { printf("\n? "); exp = read_SE(); printf("\n");

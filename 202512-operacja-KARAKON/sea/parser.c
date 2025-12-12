@@ -1,5 +1,5 @@
 #include <stdlib.h> /* atoi */
-#include <stdio.h> /* printf, getc, ungetc, stdin */
+#include <stdio.h> /* printf, getc, ungetc, FILE */
 #include <ctype.h> /* isspace, isdigit */
 #include <string.h> /* strdup */
 #include <assert.h> /* (it'll go away) */
@@ -19,11 +19,14 @@ struct {  TOKtype type;
     char buffer[TOK_BUFFER_SIZE+1];
 } cur_token;
 
+FILE *f_input;
+void set_input(FILE *f) { f_input = f; }
+
 void get_token() {
     int c, i = 0;
-    do { c = getc(stdin); } while( isspace(c) );
+    do { c = getc(f_input); } while( isspace(c) );
     switch(c) {
-    case EOF: cur_token.type = T_EOF; return; /* hmmm */
+    case EOF: cur_token.type = T_EOF; return; /* TODO! */
     case '\'': cur_token.type = T_QUOTE; return;
     case '`': cur_token.type = T_QUASIQUOTE; return;
     case ',': cur_token.type = T_UNQUOTE; return;
@@ -36,9 +39,9 @@ void get_token() {
     case '.': cur_token.type = T_DOT; return;
     default: do { cur_token.buffer[i++] = c; }
              while ( i<TOK_BUFFER_SIZE &&
-                     (c = getc(stdin))!=EOF &&
+                     (c = getc(f_input))!=EOF &&
                       !isspace(c) && c!='(' && c!=')') ;
-             ungetc(c, stdin);
+             ungetc(c, f_input);
              cur_token.buffer[i] = '\0';
              cur_token.type = T_SYM;
              return;
@@ -69,7 +72,6 @@ SE *get_SE() {
     case T_SYM_A: case T_EXP_A:
     case T_REC: h = head_for(cur_token.type);
                 get_token();
-                /* TODO checking for SYM after type annotators?? -> naah */
                 return mk_cons(h, mk_cons(get_SE(), NIL));
     case T_COMMENT: get_token(); get_SE(); /* commented expr, ignore */
                     get_token(); return get_SE();
