@@ -166,14 +166,15 @@ void pretty_write_SE(SE *s) {
     if(s==NIL) { printf("()"); return; }
     switch(TYPE(s)) {
     case SYM: printf("%s", SYMVAL(s)); return;
-    case CONS: if(CAR(s)!=NIL && TYPE(CAR(s))==SYM && TYPE(CDR(s))==CONS) {
-                 if(equal_SE(CAR(s), PS_QUOTE) && TYPE(CAR(CDR(s)))==SYM) {
+    case CONS: if(CAR(s)!=NIL && TYPE(CAR(s))==SYM &&
+                  CDR(s)!=NIL && TYPE(CDR(s))==CONS) {
+                 if(equal_SE(CAR(s), PS_QUOTE) && CAR(CDR(s))!=NIL && TYPE(CAR(CDR(s)))==SYM) {
                      printf("'"); printf(SYMVAL(CAR(CDR(s)))); return;
                  }
-                 if(equal_SE(CAR(s), PS_SYM) && TYPE(CAR(CDR(s)))==SYM) {
+                 if(equal_SE(CAR(s), PS_SYM) && CAR(CDR(s))!=NIL && TYPE(CAR(CDR(s)))==SYM) {
                      printf("$"); printf(SYMVAL(CAR(CDR(s)))); return;
                  }
-                 if(equal_SE(CAR(s), PS_EXP) && TYPE(CAR(CDR(s)))==SYM) {
+                 if(equal_SE(CAR(s), PS_EXP) && CAR(CDR(s))!=NIL && TYPE(CAR(CDR(s)))==SYM) {
                      printf("?"); printf(SYMVAL(CAR(CDR(s)))); return;
                  }
                  if(equal_SE(CAR(s), PS_QUASIQUOTE)) {
