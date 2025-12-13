@@ -1,8 +1,11 @@
-all: interpreter
+bin_name = karakon0
 
-interpreter: se.c parser.c interpreter.c
-	gcc -o karakon0 se.c parser.c interpreter.c
+all: se.c parser.c interpreter.c
+	gcc -o $(bin_name) se.c parser.c interpreter.c
+
+install:
+	cp $(bin_name) ../
 
 clean:
-	rm -f karakon0 *.o
+	rm -f $(bin_name) *.o
 

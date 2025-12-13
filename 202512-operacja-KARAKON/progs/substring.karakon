@@ -1,0 +1,14 @@
+(;(- naive matcher from Gluck&Klimov 2005 -)
+
+ (('SUBSTRING ?a ?b) ^(SUB ,a ,b ,a ,b))
+
+ (('SUB     ()     ?b ?oryg-a ?oryg-b) 'FOUND!)
+ (('SUB ($e . ?a*) ?b ?oryg-a ?oryg-b) ^(TRY ,e ,a* ,b ,oryg-a ,oryg-b))
+
+ (('TRY $e ?a     ()    ?oryg-a ?oryg-b) 'NOT-FOUND!)
+ (('TRY $e ?a ($e . ?b) ?oryg-a ?oryg-b) ^(SUB ,a ,b ,oryg-a ,oryg-b))
+ (('TRY $e ?a ( _ . ?b) ?oryg-a ?oryg-b) ^(NEXT ,oryg-a ,oryg-b))
+
+ (('NEXT ?a (_ . ?b)) ^(SUB ,a ,b ,a ,b))
+ (('NEXT  _    ()   ) 'NOT-FOUND!)
+)
