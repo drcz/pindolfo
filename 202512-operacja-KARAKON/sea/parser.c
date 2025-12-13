@@ -7,6 +7,31 @@
 #include "se.h"
 #include "parser.h"
 
+/*******************************************************************
+* poor man's port...                                              */
+FILE *f_input;
+void set_input(FILE *f) { f_input = f; }
+
+/*******************************************************************
+* stuff for pretty_write_SE...                                    */
+SE *PS_SYM, *PS_EXP, *PS_QUOTE, *PS_QUASIQUOTE, *PS_UNQUOTE, *PS_REC;
+void p_init_consts() {
+    PS_SYM = mk_sym("sym");
+    PS_EXP = mk_sym("exp");
+    PS_QUOTE = mk_sym("quote");
+    PS_QUASIQUOTE = mk_sym("quasiquote");
+    PS_UNQUOTE = mk_sym("unquote");
+    PS_REC = mk_sym("rec");
+}
+
+/*******************************************************************
+* well whatever                                                   */
+void init_parser() { set_input(stdin); p_init_consts(); }
+
+
+/*******************************************************************
+* THE LEXER                                                       */
+
 #define TOK_BUFFER_SIZE 255
 
 typedef enum { T_SYM,
@@ -15,14 +40,10 @@ typedef enum { T_SYM,
                T_SYM_A, T_EXP_A, T_REC,
                T_COMMENT, T_EOF } TOKtype;
 
-unsigned ignore_mode = 0;
-
 struct {  TOKtype type;
     char buffer[TOK_BUFFER_SIZE+1];
 } cur_token;
 
-FILE *f_input;
-void set_input(FILE *f) { f_input = f; }
 
 void get_token() {
     int c, i = 0;
@@ -49,6 +70,12 @@ void get_token() {
              return;
     }
 }
+
+
+/*******************************************************************
+* THE PARSER                                                      */
+
+unsigned ignore_mode = 0;
 
 SE *head_for(TOKtype t) {
     switch(t) {
@@ -102,6 +129,10 @@ SE *get_cdr() {
 
 SE *read_SE() { get_token(); return get_SE(); }
 
+
+/*******************************************************************
+* THE UN-PARSER                                                   */
+
 void write_cdr(SE *);
 
 void write_SE(SE *s) {
@@ -122,6 +153,53 @@ void write_cdr(SE *s) {
                                         printf(")");
                                         return; }
                     printf(" "); write_SE(CAR(s));
+                    s = CDR(s); }
+   printf(")");
+}
+
+/*******************************************************************
+* the ugly prettier unparser                                      */
+
+void pretty_write_cdr(SE *);
+
+void pretty_write_SE(SE *s) {
+    if(s==NIL) { printf("()"); return; }
+    switch(TYPE(s)) {
+    case SYM: printf("%s", SYMVAL(s)); return;
+    case CONS: if(CAR(s)!=NIL && TYPE(CAR(s))==SYM && TYPE(CDR(s))==CONS) {
+                 if(equal_SE(CAR(s), PS_QUOTE) && TYPE(CAR(CDR(s)))==SYM) {
+                     printf("'"); printf(SYMVAL(CAR(CDR(s)))); return;
+                 }
+                 if(equal_SE(CAR(s), PS_SYM) && TYPE(CAR(CDR(s)))==SYM) {
+                     printf("$"); printf(SYMVAL(CAR(CDR(s)))); return;
+                 }
+                 if(equal_SE(CAR(s), PS_EXP) && TYPE(CAR(CDR(s)))==SYM) {
+                     printf("?"); printf(SYMVAL(CAR(CDR(s)))); return;
+                 }
+                 if(equal_SE(CAR(s), PS_QUASIQUOTE)) {
+                     printf("`"); pretty_write_SE(CAR(CDR(s))); return;
+                 }
+                 if(equal_SE(CAR(s), PS_UNQUOTE)) {
+                     printf(","); pretty_write_SE(CAR(CDR(s))); return;
+                 }
+                 if(equal_SE(CAR(s), PS_REC)) {
+                     printf("^"); pretty_write_SE(CAR(CDR(s))); return;
+                 }
+               }
+               printf("(");
+               pretty_write_SE(CAR(s));
+               pretty_write_cdr(CDR(s));
+               return;
+    }
+    assert(0==1);
+}
+
+void pretty_write_cdr(SE *s) {
+    while(s!=NIL) { if(TYPE(s)!=CONS) { printf(" . ");
+                                        pretty_write_SE(s);
+                                        printf(")");
+                                        return; }
+                    printf(" "); pretty_write_SE(CAR(s));
                     s = CDR(s); }
    printf(")");
 }

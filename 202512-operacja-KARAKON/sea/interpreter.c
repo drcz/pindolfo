@@ -6,14 +6,15 @@
 #include "se.h"
 #include "parser.h"
 
-SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
-SE *S_NO_MATCH, *S_NOT_FOUND, *S_EOF;
+#define DEFAULT_HEAPSIZE 64*1024
 
 typedef enum {OFF, ONLY_EXPRS, ALL} DbgLevel;
 DbgLevel dbg_level;
 SE *program;
 
-#define DEFAULT_HEAPSIZE 64*1024
+
+SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
+SE *S_NO_MATCH, *S_NOT_FOUND, *S_EOF;
 
 void init_consts() {
     S__ = mk_sym("_");
@@ -29,6 +30,9 @@ void init_consts() {
     S_EOF = mk_sym("(EOF)");
 }
 
+
+/*******************************************************************
+* shady memory management stuff                                   */
 
 SE *clone(SE *e) { /* it's just a metaphor y'know, nobody gets cloned */
     if(e!=NIL && TYPE(e)==CONS) REFCOUNT(e)++;
@@ -62,6 +66,9 @@ void deep_free_bnd(SE *bnd) {
                       put_back_SE(tmp); } /* cons holding the above */
 }
 
+
+/*******************************************************************
+* the matching part (concerning lhs)                               */
 
 SE *lookup(SE *k, SE *bnd) {
     while(bnd!=NIL) { if(equal_SE(CAR(CAR(bnd)), k)) return CDR(CAR(bnd));
@@ -98,6 +105,9 @@ SE *is_matching(SE *lhs, SE *exp, SE *bnd) {
     free_bnd(bnd); return S_NO_MATCH;
 }
 
+
+/*******************************************************************
+* the doing part (concerning rhs)                                  */
 
 SE *value_for(SE *, SE *);
 SE *dispatch(SE *);
@@ -141,6 +151,9 @@ SE *dispatch(SE *exp) {
     free_expr(exp,NIL); return NIL; /* actually it should halt, no? */
 }
 
+/*******************************************************************
+* the REPL stuff                                                  */
+
 void print_mem_stat() {
     SE *ss = get_all_symbols();
     UL c = 0; for(;ss!=NIL;ss=CDR(ss), c++) ;
@@ -177,16 +190,16 @@ int main(int argc, char **argv) {
         }
     }
     alloc_heap(heap_size); printf("allocated %lu cells.\n", heap_size);
-    init_consts();
+    init_parser(); init_consts();
     if(f_src = fopen(argv[optind],"r")) { set_input(f_src); program = read_SE(); set_input(stdin);
                                           printf("loaded source file %s.\n", argv[optind]); }
-    else { printf("Could not open file %s.\n", argv[optind]); return 1; }
+    else { printf("could not open file %s.\n", argv[optind]); return 1; }
     bookmark_symbols();
     print_mem_stat();
     while(1) { printf("\n? "); exp = read_SE(); printf("\n");
                if(equal_SE(exp, S_EOF)) { printf("Auf wiedersehen!\n"); return 0; }
                res = dispatch(exp);
-               write_SE(res); printf("\n");
+               pretty_write_SE(res); printf("\n");
                free_SE(res);
                free_symbols_up_to_bookmark();
                print_mem_stat(); }
