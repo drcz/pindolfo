@@ -1,0 +1,38 @@
+allocated 65536 cells.
+loaded source file ../progs/lisp0.karakon.
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+(here they come: (- . -) (o . o) (* . *))
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+(du . a)
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+du
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+()
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+T
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+ok
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+ok
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+(second: two third: three)
+--- free cells: 64540 --- symbols: 63 ---
+
+? 
+Auf wiedersehen!

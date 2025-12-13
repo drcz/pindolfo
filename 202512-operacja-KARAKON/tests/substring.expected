@@ -1,0 +1,18 @@
+allocated 65536 cells.
+loaded source file ../progs/substring.karakon.
+--- free cells: 65270 --- symbols: 23 ---
+
+? 
+FOUND!
+--- free cells: 65270 --- symbols: 23 ---
+
+? 
+NOT-FOUND!
+--- free cells: 65270 --- symbols: 23 ---
+
+? 
+FOUND!
+--- free cells: 65270 --- symbols: 23 ---
+
+? 
+Auf wiedersehen!

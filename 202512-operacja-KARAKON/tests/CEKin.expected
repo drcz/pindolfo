@@ -1,0 +1,18 @@
+allocated 65536 cells.
+loaded source file ../progs/CEKin.karakon.
+--- free cells: 63778 --- symbols: 75 ---
+
+? 
+((ys a s d))
+--- free cells: 63778 --- symbols: 75 ---
+
+? 
+(q w e a s d)
+--- free cells: 63778 --- symbols: 75 ---
+
+? 
+(d s a e w q)
+--- free cells: 63778 --- symbols: 75 ---
+
+? 
+Auf wiedersehen!

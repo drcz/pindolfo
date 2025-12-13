@@ -1,0 +1,86 @@
+allocated 65536 cells.
+loaded source file ../progs/tableaux.karakon.
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+NO
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+NO
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+NO
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+YES
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+NO
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+NO
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+((q (¬ p)) ((¬ q) p))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+(((¬ q) p) ())
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+(((¬ q) p) (p))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+()
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+(((¬ q) p) (p (¬ q)) (q (¬ p)) ((¬ p) q))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+((p))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+((r (¬ q) p) (r q (¬ p)))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+(((¬ q) p))
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+()
+--- free cells: 63903 --- symbols: 67 ---
+
+? 
+Auf wiedersehen!

@@ -1,0 +1,26 @@
+allocated 65536 cells.
+loaded source file ../progs/leak-test.karakon.
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+(x x y y)
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+(dupa dupa qq qq)
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+normalnie
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+(xxx yyy)
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+(elegancko elegancko qq qq)
+--- free cells: 65368 --- symbols: 20 ---
+
+? 
+Auf wiedersehen!

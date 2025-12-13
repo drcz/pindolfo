@@ -1,0 +1,42 @@
+allocated 65536 cells.
+loaded source file ../progs/classic-tests.karakon.
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+(q w e a s d)
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+(a s d)
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+(q w e)
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+((1 2 3 1 2 3) (6 9 6 9))
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+()
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+((- . -) (0 . 0) (9 . 9) (v . v) ((o) o))
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+(KARAKON likes dercz)
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+(r e v l o v e r)
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+()
+--- free cells: 65218 --- symbols: 28 ---
+
+? 
+Auf wiedersehen!

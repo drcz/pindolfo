@@ -1,0 +1,10 @@
+(match? ('apd () ?ys) (apd () (a s d)))
+
+(run-program (apd (q w e) (a s d))
+               ( (('apd () ?ys) => ys)
+                 (('apd (?x . ?xs) ?ys) => `(,x . ,^(apd ,xs ,ys))) ))
+
+(run-program (rev (q w e a s d))
+             ( (('rev ?xs) => ^(rev ,xs ()))
+               (('rev () ?rs) => rs)
+               (('rev (?x . ?xs) ?rs) => ^(rev ,xs (,x . ,rs))) ))

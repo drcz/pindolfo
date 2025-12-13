@@ -1,0 +1,18 @@
+allocated 65536 cells.
+loaded source file ../progs/karakon.karakon.
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+((ys a s d))
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+(q w e a s d)
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+(d s a e w q)
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+Auf wiedersehen!

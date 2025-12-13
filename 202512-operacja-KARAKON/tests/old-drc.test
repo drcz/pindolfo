@@ -1,0 +1,8 @@
+(lookup z ((x . not) (y . neither) (z . (B I N G O))))
+(lookup x ((x . yes) (y . neither) (z . (B I N G O))))
+(run-drc ((CONST lo) (CONST yo) (CONS)) ())
+(dbl-apd-test (M A) (K U L A) (T U R A))
+(dbl-apd-test (M A) () (T U R A))
+(dbl-apd-test (P R O) (K U R A) (T U R A))
+(dbl-apd-test () (K U R A) ())
+(dbl-apd-test () () (T U R A))

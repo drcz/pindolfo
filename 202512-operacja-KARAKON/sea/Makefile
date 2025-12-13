@@ -9,3 +9,5 @@ install:
 clean:
 	rm -f $(bin_name) *.o
 
+tests:
+	./run-tests.rb ${bin_name}

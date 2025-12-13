@@ -3,8 +3,9 @@
 
 (('karakon ?exp ?prg) => ^(karakon ,exp ,prg ,prg))
 
-(('karakon ?exp ()                       _) => `(NO MATCH FOR ,exp))
-(('karakon ?exp ((?pat ?act) . ?prg*) ?prg) => ^(karakon* ,exp ,^(match? ,pat ,exp) ,act ,prg* ,prg))
+(('karakon ?exp ()                         _  ) => `(NO MATCH FOR ,exp))
+(('karakon ?exp ((?pat ?act)     . ?prg*) ?prg) => ^(karakon* ,exp ,^(match? ,pat ,exp) ,act ,prg* ,prg))
+(('karakon ?exp ((?pat '=> ?act) . ?prg*) ?prg) => ^(karakon* ,exp ,^(match? ,pat ,exp) ,act ,prg* ,prg))
 
 (('karakon* ?exp 'NO-MATCH  _  ?prg* ?prg) => ^(karakon ,exp ,prg* ,prg))
 (('karakon*   _    ?bnd   ?act   _   ?prg) => ^(act! ,act ,bnd (K ,prg)))
@@ -44,8 +45,6 @@
 (('aLU  _ ('JUST ?v)) => v)
 
 (('aQQ ('unquote ?e) ?bnd ?app) => ^(act! ,e ,bnd ,app))
-(('aQQ (?h . ?t)     ?bnd ?app) => hv <- ^(aQQ ,h ,bnd ,app)
-                                   tv <- ^(aQQ ,t ,bnd ,app)
-                                   `(,hv . ,tv))
+(('aQQ (?h . ?t)     ?bnd ?app) => `(,^(aQQ ,h ,bnd ,app) . ,^(aQQ ,t ,bnd ,app)))
 (('aQQ ?e             _    _  ) => e)
 )
