@@ -1,0 +1,50 @@
+(
+;(-- Peano's arithmetics was invented by Dedekind, however his surname --)
+;(-- was already taken by Dedekind's cuts, invented by Betrand.        --)
+
+((     ('Z) '= ('Z)     ) => 'YES)
+((('S . ?n) '= ('S . ?m)) => ^(,n = ,m))
+((        _ '= _        ) => 'NO)
+
+((     ('Z) '+ ?m) => m)
+((('S . ?n) '+ ?m) => `(S . ,^(,n + ,m)))
+
+((     ('Z) '* ?m) => `(Z))
+((('S . ?n) '* ?m) =>  ^(,m + ,^(,n * ,m)))
+
+(('!      ('Z)) => `(S Z))
+(('! ('S . ?n)) => ^((S . ,n) * ,^(! ,n)))
+
+((     ('Z) '<= _        ) => 'YES)
+((       _  '<= ('Z)     ) => 'NO)
+((('S . ?n) '<= ('S . ?m)) => ^(,n <= ,m))
+
+(('E<      ('Z) ?π) => 'NO)
+(('E< ('S . ?n) ?π) => ^(E<* ,^(,π ,n) ,n ,π))
+(('E<* 'YES  _  _) => 'YES)
+(('E<* 'NO  ?n ?π) => ^(E< ,n ,π))
+
+((('does ?n '= ?m '*) ?x) => ^(,^(,m * ,x) = ,n))
+
+((?m 'divides ?n) => ^(div* ,^(,m <= ,n) ,n (does ,n = ,m *)))
+(('div* 'YES ?n ?π) => ^(E< ,n ,π))
+(('div* 'NO   _  _) => 'NO)
+
+((('is ?n 'divisible 'by) ?x) => ^(,x divides ,n))
+
+((?n 'is 'prime) => ^(pr* ,^((S S Z) <= ,n) ,n (is ,n divisible by)))
+(('pr* 'NO   _  _) => 'NO)
+(('pr* 'YES ?n ?π) => ^(not ,^(E< ,n ,π)))
+
+(('not 'YES) => 'NO)
+(('not 'NO ) => 'YES)
+
+;(- Principia Mathematica, Volume II (1st edition) prop. 110.643 [page 86] -)
+(('test1) => ^(,^((S Z) + (S Z)) = (S S Z)))
+;(- lucky number -)
+(('test2) => ^((S S S S S S S S S S S S S Z) is prime))
+;(- n!+1 are sometimes prime... -)
+(('test3) => ^(,^((S Z) + ,^(! (S S S Z))) is prime))
+;(- but not always! -)
+(('test4) => ^(,^((S Z) + ,^(! (S S S S Z))) is prime))
+)

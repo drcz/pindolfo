@@ -1,0 +1,70 @@
+allocated 65536 cells.
+loaded source file ../progs/peano.karakon.
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+(S S S S S Z)
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+(S S S S S S Z)
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+(S Z)
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+(S S S S S S Z)
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+NO
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+NO
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+NO
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+YES
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+NO
+--- free cells: 64693 --- symbols: 39 ---
+
+? 
+Auf wiedersehen!

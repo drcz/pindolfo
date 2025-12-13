@@ -15,4 +15,16 @@ loaded source file ../progs/karakon.karakon.
 --- free cells: 64541 --- symbols: 46 ---
 
 ? 
+(q w e a s d)
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+((1 2 3 1 2 3) (6 9 6 9))
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
+((- . -) (0 . 0) (9 . 9) (v . v) ((o) o))
+--- free cells: 64541 --- symbols: 46 ---
+
+? 
 Auf wiedersehen!
