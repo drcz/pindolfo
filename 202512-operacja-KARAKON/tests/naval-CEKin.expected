@@ -1,0 +1,30 @@
+allocated 65536 cells.
+loaded source file ../progs/naval-CEKin.karakon.
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+((ys a s d))
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+(q w e a s d)
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+(d s a e w q)
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+(q w e a s d)
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+((1 2 3 1 2 3) (6 9 6 9))
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+((- . -) (0 . 0) (9 . 9) (v . v) ((o) o))
+--- free cells: 63569 --- symbols: 81 ---
+
+? 
+Auf wiedersehen!

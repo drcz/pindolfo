@@ -1,0 +1,91 @@
+(;(--- just CEKin, or: an abstract machine for KARAKON ---)
+
+(('lookup $k (($k . ?v) .   _ )) => `(JUST ,v))
+(('lookup $k (( _ . _ ) . ?bnd)) => ^(lookup ,k ,bnd))
+(('lookup  _ ()                ) => `(NONE))
+
+(('apd ()         ?ys) => ys)
+(('apd (?x . ?xs) ?ys) => `(,x . ,^(apd ,xs ,ys)))
+
+(('rev ?xs           ) => ^(rev ,xs ()))
+(('rev ()         ?rs) => rs)
+(('rev (?x . ?xs) ?rs) => ^(rev ,xs (,x . ,rs)))
+
+
+(('match? ?pat ?exp) => ^(match? ,pat ,exp ()))
+
+(('match? ()          ()         ?bnd) => bnd)
+(('match? '_           _         ?bnd) => bnd)
+(('match? ('quote $e) $e         ?bnd) => bnd)
+(('match? ('sym $sv)  $e         ?bnd) => ^(match-var ,sv ,e ,bnd))
+(('match? ('exp $ev)  ?e         ?bnd) => ^(match-var ,ev ,e ,bnd))
+(('match? (?p . ?ps)  (?e . ?es) ?bnd) => ^(match?* ,^(match? ,p ,e ,bnd) ,ps ,es))
+(('match? _           _          _) => 'NO-MATCH)
+
+(('match?* 'NO-MATCH _  _ ) => 'NO-MATCH)
+(('match?* ?bnd      ?p ?e) => ^(match? ,p ,e ,bnd))
+
+(('match-var $v ?e ?bnd) => ^(match-var* ,^(lookup ,v ,bnd) ,v ,e ,bnd))
+(('match-var* ('NONE)    $v ?e ?bnd) => `((,v . ,e) . ,bnd))
+
+(('match-var* ('JUST ?e) $v ?e ?bnd) => bnd)
+(('match-var* ('JUST _)   _  _   _ ) => 'NO-MATCH)
+
+
+(('subst ?e 'at ()        'in _        ) => e)
+(('subst ?e 'at ('A . ?a) 'in (?h . ?t)) => `(,^(subst ,e at ,a in ,h) . ,t))
+(('subst ?e 'at ('D . ?a) 'in (?h . ?t)) => `(,h . ,^(subst ,e at ,a in ,t)))
+
+(('tsbut ?e 'at ?a 'in ?e*) => ^(subst ,e at ,^(rev ,a) in ,e*)) ;(- sorry -)
+
+((('step ?prg) ((?r) _                               ())) => `(HALT ,r))
+
+((('step ?prg) (?C   (?e . ?E) ($var              . ?K))) => ^(LU-step (,C (,e . ,E) ,K) ,var ,^(lookup ,var ,e)))
+((('step ?prg) (?C   ?E        (('quote $s)       . ?K))) => `((,s . ,C) ,E ,K))
+((('step ?prg) (?C   ?E        (()                . ?K))) => `((() . ,C) ,E ,K))
+((('step ?prg) (?C   ?E        (('quasiquote ?qq) . ?K))) => `(,C ,E (,^(mk-kQQ ,qq) . ,K)))
+((('step ?prg) (?C   ?E        (('rec ?qq)        . ?K))) => `(,C ,E (,^(mk-kQQ ,qq) (kREC) . ,K)))
+
+((('step ?prg) (?C        ?E (('kQQ< () ()          ?bp) . ?K))) => `((,bp . ,C) ,E ,K))
+((('step ?prg) (?C        ?E (('kQQ< (?u . ?us) ?as ?bp) . ?K))) => `(,C ,E (,u (kQQ> ,us ,as ,bp) . ,K)))
+((('step ?prg) ((?c . ?C) ?E (('kQQ> ?us (?a . ?as) ?bp) . ?K))) => `(,C ,E ((kQQ< ,us ,as ,^(tsbut ,c at ,a in ,bp)) . ,K)))
+
+((('step ?prg) ((?c . ?C)       ?E (('kREC) . ?K))) => ^(M-step ,prg (,C ,E ,K) ,c))
+((('step ?prg) (?C        (_ . ?E) (('kPOP) . ?K))) => `(,C ,E ,K))
+
+(('LU-step _          $var ('NONE)   ) => `(HALT (UNBOUND VARIABLE ,var)))
+(('LU-step (?C ?E ?K) _    ('JUST ?e)) => `((,e . ,C) ,E ,K))
+
+;(- emulating the naval way for a warmup... -)
+(('mk-kQQ ?qq) => `(kQQ< . ,^(mk-kQQ* ((,qq ()))
+                                      () ()
+                                      ())))
+
+(('mk-kQQ* ()                           ?es ?as ?bp) => `(,es ,as ,bp))
+
+(('mk-kQQ* ((('unquote ?e) ?a) . ?pend) ?es ?as ?bp) => ^(mk-kQQ* ,pend
+                                                                  (,e . ,es) (,a . ,as)
+                                                                  ,^(tsbut () at ,a in ,bp)))
+
+(('mk-kQQ* (((?h . ?t) ?a) . ?pend) ?es ?as ?bp) => ^(mk-kQQ* ((,h (A . ,a)) (,t (D . ,a)) . ,pend)
+                                                              ,es ,as
+                                                              ,^(tsbut (() . ()) at ,a in ,bp)))
+
+(('mk-kQQ* ((?c ?a) . ?pend) ?es ?as ?bp) => ^(mk-kQQ* ,pend
+                                                       ,es ,as
+                                                       ,^(tsbut ,c at ,a in ,bp)))
+;(- end of emulation he_he -)
+
+(('M-step ()                          _ ?exp) => `(HALT (NO MATCH FOR ,exp)))
+(('M-step ((?lhs '=> ?rhs) . ?prg) ?CEK ?exp) => ^(M-step* ,prg ,rhs ,CEK ,^(match? ,lhs ,exp) ,exp))
+(('M-step ((?lhs ?rhs)     . ?prg) ?CEK ?exp) => ^(M-step* ,prg ,rhs ,CEK ,^(match? ,lhs ,exp) ,exp)) ;(- hehe -)
+
+(('M-step* ?prg _    ?CEK       'NO-MATCH ?exp) => ^(M-step ,prg ,CEK ,exp))
+(('M-step* ?prg ?rhs (?C ?E ?K) ?bnd      _   ) => `(,C (,bnd . ,E) (,rhs (kPOP) . ,K)))
+
+((('run* ?step) ('HALT ?msg)) => msg)
+((('run* ?step) ?CEK        ) => ^((run* ,step) ,^(,step ,CEK)))
+
+(('run-program ?exp ?program) => ^((run* (step ,program)) (() () ((rec ,exp)))))
+
+)
