@@ -11,7 +11,7 @@
 typedef enum {OFF, ONLY_EXPRS, ALL} DbgLevel;
 DbgLevel dbg_level;
 SE *program;
-
+char _me_halted_; /* sorry, temporary measures to avoid long_jmp etc */
 
 SE *S__, *S_SYM, *S_EXP, *S_QUOTE, *S_QUASIQUOTE, *S_UNQUOTE, *S_REC, *S_ARR;
 SE *S_NO_MATCH, *S_NOT_FOUND, *S_EOF;
@@ -131,6 +131,7 @@ SE *value_for(SE *rhs, SE *bnd) {
 
 SE *dispatch(SE *exp) {
     SE *p0 = program,*lhs,*rhs,*bnd,*res;
+    if(_me_halted_) return NIL;
     if(dbg_level!=OFF) { printf("<e> "); write_SE(exp); printf("\n"); }
     while(p0!=NIL) { assert(TYPE(p0)==CONS);
                      lhs = car(CAR(p0));
@@ -148,7 +149,7 @@ SE *dispatch(SE *exp) {
                                            return res; }
                      p0 = cdr(p0); }
     printf("NO MATCH FOR "); write_SE(exp); printf("\n");
-    free_expr(exp,NIL); return NIL; /* actually it should halt, no? */
+    free_expr(exp,NIL); _me_halted_ = 1; return NIL;
 }
 
 /*******************************************************************
@@ -196,7 +197,8 @@ int main(int argc, char **argv) {
     else { printf("could not open file %s.\n", argv[optind]); return 1; }
     bookmark_symbols();
     print_mem_stat();
-    while(1) { printf("\n? "); exp = read_SE(); printf("\n");
+    while(1) { _me_halted_ = 0;
+               printf("\n? "); exp = read_SE(); printf("\n");
                if(equal_SE(exp, S_EOF)) { printf("Auf wiedersehen!\n"); return 0; }
                res = dispatch(exp);
                pretty_write_SE(res); printf("\n");
