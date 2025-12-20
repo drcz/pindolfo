@@ -148,7 +148,7 @@ SE *dispatch(SE *exp) {
                                            deep_free_bnd(bnd);
                                            return res; }
                      p0 = cdr(p0); }
-    printf("NO MATCH FOR "); write_SE(exp); printf("\n");
+    printf("NO MATCH FOR "); pretty_write_SE(exp); printf("\n");
     free_expr(exp,NIL); _me_halted_ = 1; return NIL;
 }
 
